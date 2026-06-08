@@ -1,0 +1,283 @@
+/**
+ * Supabase client initialisation and data helpers for ArcTime.
+ * All browser-side queries use the anon key — RLS enforces permissions.
+ */
+
+const SUPABASE_URL = 'https://bszdmkydzzujvctgihqk.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_Wyo_dz2gBAhc6Xg46R8qvg_UPRLIS73';
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true
+  }
+});
+
+// ============================================================
+// AUTH
+// ============================================================
+
+async function arctimeSignUp(email, password, displayName, username) {
+  const { data, error } = await supabase.auth.signUp({ email, password });
+  if (error) return { error };
+
+  // Create profile row (RLS allows insert with auth.uid() = id)
+  const { error: profileError } = await supabase.from('profiles').insert({
+    id: data.user.id,
+    display_name: displayName,
+    username: username
+  });
+
+  if (profileError) return { error: profileError };
+  return { data };
+}
+
+async function arctimeSignIn(email, password) {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) return { error };
+  return { data };
+}
+
+async function arctimeSignOut() {
+  const { error } = await supabase.auth.signOut();
+  return { error };
+}
+
+async function arctimeGetSession() {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) return { session: null, error };
+  return { session: data.session, error: null };
+}
+
+function arctimeOnAuth(callback) {
+  return supabase.auth.onAuthStateChange(callback);
+}
+
+// ============================================================
+// PROFILES
+// ============================================================
+
+async function arctimeGetProfile(userId) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single();
+  return { data, error };
+}
+
+async function arctimeUpdateProfile(userId, updates) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .update(updates)
+    .eq('id', userId)
+    .select()
+    .single();
+  return { data, error };
+}
+
+async function arctimeSearchUsers(query) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, username, display_name, avatar_url')
+    .or(`username.ilike.%${query}%,display_name.ilike.%${query}%`)
+    .limit(10);
+  return { data, error };
+}
+
+async function arctimeGetProfileByUsername(username) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('username', username)
+    .maybeSingle();
+  return { data, error };
+}
+
+// ============================================================
+// EVENTS
+// ============================================================
+
+async function arctimeGetEvents(startDay, endDay) {
+  let query = supabase.from('events').select('*');
+  if (startDay !== undefined) query = query.gte('day_index', startDay);
+  if (endDay !== undefined) query = query.lte('day_index', endDay);
+  const { data, error } = await query.order('day_index').order('start_time');
+  return { data, error };
+}
+
+async function arctimeCreateEvent(event) {
+  const { data, error } = await supabase
+    .from('events')
+    .insert(event)
+    .select()
+    .single();
+  return { data, error };
+}
+
+async function arctimeUpdateEvent(eventId, updates) {
+  const { data, error } = await supabase
+    .from('events')
+    .update(updates)
+    .eq('id', eventId)
+    .select()
+    .single();
+  return { data, error };
+}
+
+async function arctimeDeleteEvent(eventId) {
+  const { error } = await supabase
+    .from('events')
+    .delete()
+    .eq('id', eventId);
+  return { error };
+}
+
+// ============================================================
+// EVENT ATTENDEES
+// ============================================================
+
+async function arctimeAddAttendees(eventId, userIds) {
+  const rows = userIds.map(uid => ({ event_id: eventId, user_id: uid }));
+  const { data, error } = await supabase
+    .from('event_attendees')
+    .insert(rows)
+    .select();
+  return { data, error };
+}
+
+async function arctimeGetAttendees(eventId) {
+  const { data, error } = await supabase
+    .from('event_attendees')
+    .select('user_id')
+    .eq('event_id', eventId);
+  return { data: data ? data.map(r => r.user_id) : [], error };
+}
+
+// ============================================================
+// FRIEND REQUESTS
+// ============================================================
+
+async function arctimeSendFriendRequest(senderId, receiverId) {
+  const { data, error } = await supabase
+    .from('friend_requests')
+    .insert({ sender_id: senderId, receiver_id: receiverId, status: 'pending' })
+    .select()
+    .single();
+  return { data, error };
+}
+
+async function arctimeGetFriendRequests(userId) {
+  const { data, error } = await supabase
+    .from('friend_requests')
+    .select('*')
+    .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+    .order('created_at', { ascending: false });
+  return { data, error };
+}
+
+async function arctimeAcceptFriendRequest(requestId) {
+  // Get the request first to know sender/receiver
+  const { data: req, error: getError } = await supabase
+    .from('friend_requests')
+    .select('*')
+    .eq('id', requestId)
+    .single();
+  if (getError) return { error: getError };
+
+  // Update status to accepted
+  const { error: updateError } = await supabase
+    .from('friend_requests')
+    .update({ status: 'accepted' })
+    .eq('id', requestId);
+  if (updateError) return { error: updateError };
+
+  // Create friendship row (user_id_1 < user_id_2)
+  const id1 = req.sender_id < req.receiver_id ? req.sender_id : req.receiver_id;
+  const id2 = req.sender_id < req.receiver_id ? req.receiver_id : req.sender_id;
+  const { error: friendError } = await supabase
+    .from('friendships')
+    .insert({ user_id_1: id1, user_id_2: id2 });
+  if (friendError) return { error: friendError };
+
+  return { data: req };
+}
+
+async function arctimeDeclineFriendRequest(requestId) {
+  const { error } = await supabase
+    .from('friend_requests')
+    .update({ status: 'declined' })
+    .eq('id', requestId);
+  return { error };
+}
+
+async function arctimeCancelFriendRequest(requestId) {
+  const { error } = await supabase
+    .from('friend_requests')
+    .delete()
+    .eq('id', requestId);
+  return { error };
+}
+
+// ============================================================
+// FRIENDSHIPS
+// ============================================================
+
+async function arctimeRemoveFriend(userId, friendId) {
+  const id1 = userId < friendId ? userId : friendId;
+  const id2 = userId < friendId ? friendId : userId;
+  const { error } = await supabase
+    .from('friendships')
+    .delete()
+    .eq('user_id_1', id1)
+    .eq('user_id_2', id2);
+  return { error };
+}
+
+async function arctimeGetFriends(userId) {
+  const { data, error } = await supabase
+    .from('friendships')
+    .select(`
+      user_id_1, user_id_2,
+      profile1:profiles!friendships_user_id_1_fkey(id, username, display_name, avatar_url),
+      profile2:profiles!friendships_user_id_2_fkey(id, username, display_name, avatar_url)
+    `)
+    .or(`user_id_1.eq.${userId},user_id_2.eq.${userId}`);
+  if (error) return { data: null, error };
+
+  // Flatten into a list of friend profiles
+  const friends = data.map(row => {
+    const friend = row.user_id_1 === userId ? row.profile2 : row.profile1;
+    return friend;
+  });
+  return { data: friends, error: null };
+}
+
+// ============================================================
+// REALTIME SUBSCRIPTIONS
+// ============================================================
+
+function arctimeSubscribeEvents(channelName, callback) {
+  return supabase
+    .channel(channelName)
+    .on('postgres_changes',
+      { event: '*', schema: 'public', table: 'events' },
+      (payload) => callback(payload)
+    )
+    .subscribe();
+}
+
+function arctimeSubscribeFriendRequests(userId, callback) {
+  return supabase
+    .channel('friend-requests')
+    .on('postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'friend_requests', filter: `receiver_id=eq.${userId}` },
+      (payload) => callback(payload)
+    )
+    .subscribe();
+}
+
+function arctimeUnsubscribe(channel) {
+  if (channel) supabase.removeChannel(channel);
+}

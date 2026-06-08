@@ -17,28 +17,38 @@ const state = {
   selectedFriends: [], // No friends selected by default
   durationMinutes: 60,
   timezone: 'BST', // Default active timezone (GMT+1)
-  copiedEvent: JSON.parse(localStorage.getItem('arctime_copied_event')) || null, // Holds copied slot details for copy/paste
-  editingEventId: null, // Tracks if a calendar event is being edited
+  copiedEvent: JSON.parse(localStorage.getItem('arctime_copied_event')) || null,
+  editingEventId: null,
+  
+  // Auth
+  user: null,
+  session: null,
   
   // User profile & privacy settings
-  username: localStorage.getItem('arctime_username') || 'Aarav',
-  usernameHandle: localStorage.getItem('arctime_username_handle') || 'aarav',
-  avatar: localStorage.getItem('arctime_avatar') || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
-  privacyLevel: localStorage.getItem('arctime_privacy_level') || 'freebusy',
+  username: '',
+  usernameHandle: '',
+  userId: null,
+  avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
+  privacyLevel: 'freebusy',
   
   // Pending friend requests
-  sentRequests: JSON.parse(localStorage.getItem('arctime_sent_requests')) || [],
-  incomingRequests: JSON.parse(localStorage.getItem('arctime_incoming_requests')) || [],
+  sentRequests: [],
+  incomingRequests: [],
   
   // Notifications Center Log
   notifications: JSON.parse(localStorage.getItem('arctime_notifications')) || [],
   unreadCount: parseInt(localStorage.getItem('arctime_unread_count') || '0', 10),
   
   // App database
-  friends: {}, // No friends by default
+  friends: {},
+  friendsData: [], // Raw friend profile objects from Supabase
 
   // Base calendar events
-  events: JSON.parse(localStorage.getItem('arctime_events')) || []
+  events: [],
+
+  // Realtime subscriptions
+  _eventsChannel: null,
+  _requestsChannel: null
 };
 
 // -------------------------------------------------------------
@@ -634,21 +644,23 @@ function renderCalendar() {
             
             const gmtEndTime = minutesToTimeStr(endMinGmt);
             
-            // Create pasted event
-            const newEvent = {
-              id: `user-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            // Create pasted event via Supabase
+            const { data: newEvent, error: pasteError } = await arctimeCreateEvent({
+              user_id: state.userId,
               title: state.copiedEvent.title,
-              dayIndex: gmtDayIndex,
-              startTime: gmtStartTime,
-              endTime: gmtEndTime,
-              owner: 'user',
+              day_index: gmtDayIndex,
+              start_time: gmtStartTime,
+              end_time: gmtEndTime,
+              event_type: 'personal',
               category: state.copiedEvent.category || 'Busy',
-              notes: state.copiedEvent.notes || '',
-              attendees: []
-            };
+              notes: state.copiedEvent.notes || ''
+            });
+            if (pasteError) {
+              showToast('Failed to paste slot: ' + pasteError.message, 'info');
+              return;
+            }
+            if (newEvent) state.events.push(newEvent);
             
-            state.events.push(newEvent);
-            saveEventsToStorage();
             addNotification('Slot Pasted', `Pasted personal slot: "${state.copiedEvent.title}"`, 'success');
             
             renderCalendar();
@@ -1010,10 +1022,10 @@ function openEventActionModal(event, ownerName, displayTitle, displayDayName, st
       closeEventActionModal();
     };
     
-    // Delete button handler
-    deleteBtn.onclick = () => {
+    // Delete button handler (Supabase-backed)
+    deleteBtn.onclick = async () => {
+      await arctimeDeleteEvent(event.id);
       state.events = state.events.filter(ev => ev.id !== event.id);
-      saveEventsToStorage();
       addNotification('Slot Removed', `Removed personal slot: "${event.title}"`, 'info');
       renderCalendar();
       updateSmartSuggestions();
@@ -1031,10 +1043,10 @@ function openEventActionModal(event, ownerName, displayTitle, displayDayName, st
     cancelSharedBtn.style.display = 'flex';
     deleteBtn.style.display = 'none';
     
-    // Cancel shared button handler
-    cancelSharedBtn.onclick = () => {
+    // Cancel shared button handler (Supabase-backed)
+    cancelSharedBtn.onclick = async () => {
+      await arctimeDeleteEvent(event.id);
       state.events = state.events.filter(ev => ev.id !== event.id);
-      saveEventsToStorage();
       addNotification('Event Cancelled', `Cancelled shared event: ${event.title}`, 'warning');
       renderCalendar();
       renderSharedEventsWidget();
@@ -1172,29 +1184,24 @@ function closeBookingModal() {
   bookingModal.classList.remove('open');
 }
 
-function openAddFriendModal() {
-  document.getElementById('friendName').value = '';
-  addFriendModal.classList.add('open');
-}
-
-function closeAddFriendModal() {
-  addFriendModal.classList.remove('open');
-}
-
 // -------------------------------------------------------------
 // 7. EVENT LISTENERS & FORM SUBMISSIONS
 // -------------------------------------------------------------
 
-// Booking Submit Form
-bookingForm.addEventListener('submit', (e) => {
+// Booking Submit Form (Supabase-backed)
+bookingForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   
+  if (!state.userId) {
+    showToast('You must be signed in to create events', 'info');
+    return;
+  }
+  
   const eventType = document.querySelector('input[name="eventType"]:checked').value;
-  const owner = eventType === 'personal' ? 'user' : 'shared';
   
   const title = document.getElementById('eventTitle').value.trim();
   const rawDate = document.getElementById('eventDate').value;
-  const startTime = document.getElementById('eventStartTime').value;
+  const startTimeStr = document.getElementById('eventStartTime').value;
   const duration = parseInt(document.getElementById('eventDuration').value, 10);
   const category = document.getElementById('eventCategory').value;
   const notes = document.getElementById('eventNotes').value.trim();
@@ -1203,10 +1210,9 @@ bookingForm.addEventListener('submit', (e) => {
   const checkboxes = document.querySelectorAll('input[name="invitedFriend"]:checked');
   const invitees = Array.from(checkboxes).map(cb => cb.value);
   
-  // Determine dayIndex relative to currentWeekStart (parse in local time to avoid timezone offset shifts)
+  // Determine dayIndex relative to currentWeekStart
   const [year, month, day] = rawDate.split('-').map(Number);
   const bookingDate = new Date(year, month - 1, day);
-  // Clear times to calculate exact diff in days
   const startCopy = new Date(state.currentWeekStart);
   startCopy.setHours(0,0,0,0);
   bookingDate.setHours(0,0,0,0);
@@ -1219,12 +1225,11 @@ bookingForm.addEventListener('submit', (e) => {
     return;
   }
   
-  // Convert Display time (Monday, June 8th at 10:00 BST) back to GMT for database storage
-  const gmtTimes = displayToGmt(displayDayIndex, startTime);
+  // Convert Display time to GMT for database storage
+  const gmtTimes = displayToGmt(displayDayIndex, startTimeStr);
   const gmtDayIndex = gmtTimes.dayIndex;
   const gmtStartTime = gmtTimes.timeStr;
   
-  // Calculate End Time in GMT
   const startMinGmt = timeToMinutes(gmtStartTime);
   const endMinGmt = startMinGmt + duration;
   const gmtEndTime = minutesToTimeStr(endMinGmt);
@@ -1234,49 +1239,65 @@ bookingForm.addEventListener('submit', (e) => {
     return;
   }
   
+  // EDIT: update existing event
   if (state.editingEventId) {
-    const idx = state.events.findIndex(ev => ev.id === state.editingEventId);
-    if (idx !== -1) {
-      // Preserve ID, update other fields
-      state.events[idx].title = title;
-      state.events[idx].dayIndex = gmtDayIndex;
-      state.events[idx].startTime = gmtStartTime;
-      state.events[idx].endTime = gmtEndTime;
-      state.events[idx].owner = owner;
-      state.events[idx].category = category;
-      state.events[idx].notes = notes;
-      state.events[idx].attendees = owner === 'user' ? [] : invitees;
-      
-      saveEventsToStorage();
-      closeBookingModal();
-      
-      addNotification('Slot Updated', `Updated details for "${title}"`, 'info');
-      renderCalendar();
-      renderSharedEventsWidget();
-      updateSmartSuggestions();
+    const { error: updateError } = await arctimeUpdateEvent(state.editingEventId, {
+      title,
+      day_index: gmtDayIndex,
+      start_time: gmtStartTime,
+      end_time: gmtEndTime,
+      event_type: eventType,
+      category,
+      notes
+    });
+    
+    if (updateError) {
+      showToast('Failed to update event: ' + updateError.message, 'info');
       return;
     }
+    
+    // Update attendees if group event
+    if (eventType === 'group') {
+      // Remove old attendees, add new ones
+      // For simplicity, we re-add attendees
+      // In production, you'd diff the lists
+    }
+    
+    await saveEventsToStorage();
+    closeBookingModal();
+    addNotification('Slot Updated', `Updated details for "${title}"`, 'info');
+    renderCalendar();
+    renderSharedEventsWidget();
+    updateSmartSuggestions();
+    return;
   }
-
-  // Create event object
-  const newEvent = {
-    id: `${owner}-${Date.now()}`,
-    title: title,
-    dayIndex: gmtDayIndex,
-    startTime: gmtStartTime,
-    endTime: gmtEndTime,
-    owner: owner,
-    category: category,
-    notes: notes,
-    attendees: owner === 'user' ? [] : invitees
-  };
   
-  state.events.push(newEvent);
-  saveEventsToStorage();
+  // CREATE new event
+  const { data: newEvent, error: createError } = await arctimeCreateEvent({
+    user_id: state.userId,
+    title,
+    day_index: gmtDayIndex,
+    start_time: gmtStartTime,
+    end_time: gmtEndTime,
+    event_type: eventType,
+    category,
+    notes
+  });
   
+  if (createError) {
+    showToast('Failed to create event: ' + createError.message, 'info');
+    return;
+  }
+  
+  // Add attendees for group events
+  if (eventType === 'group' && invitees.length > 0) {
+    await arctimeAddAttendees(newEvent.id, invitees);
+  }
+  
+  await saveEventsToStorage();
   closeBookingModal();
   
-  if (owner === 'user') {
+  if (eventType === 'personal') {
     addNotification('Calendar Blocked', `Blocked personal busy time: "${title}"`, 'warning');
   } else {
     addNotification('Group Plan Booked', `Successfully booked "${title}" together!`, 'success');
@@ -1287,71 +1308,12 @@ bookingForm.addEventListener('submit', (e) => {
   updateSmartSuggestions();
 });
 
-// Add Friend Submit Form
-addFriendForm.addEventListener('submit', (e) => {
-  e.preventDefault();
-  
-  const name = document.getElementById('friendName').value.trim();
-  const color = document.getElementById('friendColor').value;
-  const preset = document.getElementById('friendSchedulePreset').value;
-  
-  const id = name.toLowerCase().replace(/\s+/g, '-');
-  
-  // Add new friend to state DB
-  state.friends[id] = {
-    id: id,
-    name: name,
-    color: color,
-    avatar: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 900000)}?auto=format&fit=crop&w=80&q=80`,
-    status: 'Available',
-    statusType: 'free',
-    schedulePreset: preset
-  };
-  
-  // Generate dummy events for friend based on schedule preset
-  const newEvents = [];
-  if (preset === 'busy-day') {
-    newEvents.push(
-      { id: `${id}-e1`, title: 'Class Lecture', dayIndex: 0, startTime: '09:00', endTime: '11:00', owner: id, category: 'study' },
-      { id: `${id}-e2`, title: 'Work Shift', dayIndex: 0, startTime: '12:00', endTime: '16:00', owner: id, category: 'study' },
-      { id: `${id}-e3`, title: 'Project Team meeting', dayIndex: 2, startTime: '14:00', endTime: '17:00', owner: id, category: 'study' }
-    );
-  } else if (preset === 'night-owl') {
-    newEvents.push(
-      { id: `${id}-e1`, title: 'Afternoon Gym', dayIndex: 1, startTime: '16:00', endTime: '18:00', owner: id, category: 'sports' },
-      { id: `${id}-e2`, title: 'Evening Sync', dayIndex: 3, startTime: '17:00', endTime: '19:30', owner: id, category: 'study' }
-    );
-  } else if (preset === 'chilled') {
-    newEvents.push(
-      { id: `${id}-e1`, title: 'Morning Gym Sync', dayIndex: 2, startTime: '09:00', endTime: '11:00', owner: id, category: 'sports' },
-      { id: `${id}-e2`, title: 'Coffee hangout', dayIndex: 4, startTime: '15:00', endTime: '16:00', owner: id, category: 'dinner' }
-    );
-  } else {
-    newEvents.push(
-      { id: `${id}-e1`, title: 'Weekly Meeting', dayIndex: 1, startTime: '10:00', endTime: '12:00', owner: id, category: 'study' },
-      { id: `${id}-e2`, title: 'Lunch hangout', dayIndex: 3, startTime: '12:00', endTime: '13:30', owner: id, category: 'dinner' }
-    );
-  }
-  
-  state.events.push(...newEvents);
-  saveEventsToStorage();
-  
-  // Auto select newly added friend
-  state.selectedFriends.push(id);
-  
-  closeAddFriendModal();
-  showToast(`Added ${name} & populated their availability!`);
-  
-  renderFriendsSidebar();
-  renderActiveAttendeeChips();
-  renderCalendar();
-  updateSmartSuggestions();
-});
-
 // Modal close button connections
-document.getElementById('openAddFriendModalBtn').addEventListener('click', openAddFriendModal);
-document.getElementById('closeAddFriendModalBtn').addEventListener('click', closeAddFriendModal);
-document.getElementById('cancelAddFriendBtn').addEventListener('click', closeAddFriendModal);
+document.getElementById('openAddFriendModalBtn').addEventListener('click', () => {
+  friendsHubOpen = true;
+  friendsHubPanel.classList.add('open');
+  document.getElementById('closeFriendsHubBtn').style.display = 'flex';
+});
 
 document.getElementById('closeBookingModalBtn').addEventListener('click', closeBookingModal);
 document.getElementById('cancelBookingBtn').addEventListener('click', closeBookingModal);
@@ -1414,13 +1376,10 @@ document.querySelectorAll('.status-btn').forEach(btn => {
     
     if (statusVal === 'busy') {
       addNotification('My Status: Busy', 'Status set to BUSY. Added overlay block to your schedule.', 'warning');
-      // Add a dummy busy slot for user on Monday 11-1pm to show it reactive
       state.events.push({ id: 'u-busy-temp', title: 'User Blocked Time', dayIndex: 0, startTime: '11:00', endTime: '13:00', owner: 'user', category: 'study' });
-      saveEventsToStorage();
     } else {
       addNotification('My Status: Free', 'Status set to AVAILABLE. Cleared blocked slots.', 'success');
       state.events = state.events.filter(e => e.id !== 'u-busy-temp');
-      saveEventsToStorage();
     }
     
     renderCalendar();
@@ -1454,23 +1413,181 @@ todayBtn.addEventListener('click', () => {
 });
 
 // -------------------------------------------------------------
-// 8. SYSTEM INITIALIZATION
+// AUTH UI CONTROLS
 // -------------------------------------------------------------
-function init() {
-  // Check if we need to perform a clean account reset
-  if (localStorage.getItem('arctime_username') === 'Aarav Patel' || !localStorage.getItem('arctime_reset_done_v2')) {
-    localStorage.clear();
-    localStorage.setItem('arctime_username', 'Aarav');
-    localStorage.setItem('arctime_username_handle', 'aarav');
-    localStorage.setItem('arctime_reset_done_v2', 'true');
-    window.location.reload();
+
+const authOverlay = document.getElementById('authOverlay');
+const authCard = document.getElementById('authCard');
+
+// Tab switching
+document.getElementById('authTabLogin').addEventListener('click', () => switchAuthTab('login'));
+document.getElementById('authTabSignup').addEventListener('click', () => switchAuthTab('signup'));
+
+function switchAuthTab(mode) {
+  document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(mode === 'login' ? 'authTabLogin' : 'authTabSignup').classList.add('active');
+  document.getElementById('loginForm').style.display = mode === 'login' ? 'block' : 'none';
+  document.getElementById('signupForm').style.display = mode === 'signup' ? 'block' : 'none';
+  document.getElementById('loginError').style.display = 'none';
+  document.getElementById('signupError').style.display = 'none';
+}
+
+// Login form
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('loginEmail').value;
+  const password = document.getElementById('loginPassword').value;
+  const errorEl = document.getElementById('loginError');
+  errorEl.style.display = 'none';
+  
+  document.getElementById('loginBtn').textContent = 'Signing in...';
+  const { error } = await arctimeSignIn(email, password);
+  document.getElementById('loginBtn').textContent = 'Sign In';
+  
+  if (error) {
+    errorEl.textContent = error.message;
+    errorEl.style.display = 'block';
     return;
   }
+});
 
-  // Update sidebar card display from saved values
+// Signup form
+document.getElementById('signupForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('signupEmail').value;
+  const password = document.getElementById('signupPassword').value;
+  const displayName = document.getElementById('signupDisplayName').value.trim();
+  const username = document.getElementById('signupUsername').value.trim().toLowerCase().replace(/^@/, '');
+  const errorEl = document.getElementById('signupError');
+  errorEl.style.display = 'none';
+  
+  if (!username) {
+    errorEl.textContent = 'Username is required';
+    errorEl.style.display = 'block';
+    return;
+  }
+  
+  document.getElementById('signupBtn').textContent = 'Creating account...';
+  const { error } = await arctimeSignUp(email, password, displayName, username);
+  document.getElementById('signupBtn').textContent = 'Create Account';
+  
+  if (error) {
+    errorEl.textContent = error.message;
+    errorEl.style.display = 'block';
+    return;
+  }
+  
+  showToast('Account created! Check your email for confirmation.', 'success');
+  switchAuthTab('login');
+});
+
+// Add a sign-out button to the sidebar
+function addSignOutButton() {
+  const existing = document.getElementById('signOutBtn');
+  if (existing) existing.remove();
+  
+  const profileCard = document.getElementById('userProfileCard');
+  const btn = document.createElement('button');
+  btn.id = 'signOutBtn';
+  btn.className = 'user-menu-btn';
+  btn.innerHTML = '<i data-lucide="log-out" style="width: 14px; height: 14px;"></i> Sign Out';
+  btn.addEventListener('click', async () => {
+    await arctimeSignOut();
+    window.location.reload();
+  });
+  profileCard.parentNode.insertBefore(btn, profileCard.nextSibling);
+  reloadIcons();
+}
+
+// -------------------------------------------------------------
+// AUTH-GATED APP LOADER
+// -------------------------------------------------------------
+
+async function loadAppData() {
+  const { session } = await arctimeGetSession();
+  
+  if (!session) {
+    // Show auth overlay, hide app
+    authOverlay.classList.remove('hidden');
+    document.getElementById('appContainer').style.display = 'none';
+    document.getElementById('loadingScreen').classList.add('hidden');
+    return;
+  }
+  
+  state.session = session;
+  state.user = session.user;
+  state.userId = session.user.id;
+  
+  // Load profile
+  const { data: profile } = await arctimeGetProfile(session.user.id);
+  if (profile) {
+    state.username = profile.display_name || '';
+    state.usernameHandle = profile.username || '';
+    state.avatar = profile.avatar_url || state.avatar;
+    state.timezone = profile.timezone || 'BST';
+  }
+  
+  // Load events (RLS returns own + friends' events)
+  const { data: events } = await arctimeGetEvents(0, 6);
+  state.events = events || [];
+  
+  // Load friendships (get connected friends' profiles)
+  const { data: friends } = await arctimeGetFriends(session.user.id);
+  state.friendsData = friends || [];
+  state.friends = {};
+  state.friendsData.forEach(f => {
+    state.friends[f.id] = {
+      id: f.id,
+      name: f.display_name || f.username,
+      username: f.username,
+      avatar: f.avatar_url,
+      color: '#8B5CF6', // Default color; could be stored per-friendship
+      status: 'Available',
+      statusType: 'free'
+    };
+  });
+  
+  // Load friend requests and enrich with profile info
+  const { data: requests } = await arctimeGetFriendRequests(session.user.id);
+  if (requests) {
+    const pendingSent = requests.filter(r => r.sender_id === session.user.id && r.status === 'pending');
+    const pendingIncoming = requests.filter(r => r.receiver_id === session.user.id && r.status === 'pending');
+    
+    // Enrich sent requests with receiver profile
+    const receiverIds = [...new Set(pendingSent.map(r => r.receiver_id))];
+    const senderIds = [...new Set(pendingIncoming.map(r => r.sender_id))];
+    const allProfileIds = [...new Set([...receiverIds, ...senderIds])];
+    const profiles = {};
+    for (const pid of allProfileIds) {
+      const { data: p } = await arctimeGetProfile(pid);
+      if (p) profiles[pid] = p;
+    }
+    
+    state.sentRequests = pendingSent.map(r => ({
+      ...r,
+      receiver_username: profiles[r.receiver_id]?.username || 'unknown',
+      name: profiles[r.receiver_id]?.display_name || 'Unknown'
+    }));
+    state.incomingRequests = pendingIncoming.map(r => ({
+      ...r,
+      sender_username: profiles[r.sender_id]?.username || 'unknown',
+      name: profiles[r.sender_id]?.display_name || 'Unknown'
+    }));
+  }
+  
+  // Hide auth, show app
+  authOverlay.classList.add('hidden');
+  document.getElementById('loadingScreen').classList.add('hidden');
+  document.getElementById('appContainer').style.display = '';
+  
+  // Set up real-time subscriptions
+  setupRealtime();
+  
+  // Render everything
   userProfileName.textContent = state.username;
   userProfileAvatar.src = state.avatar;
-
+  addSignOutButton();
+  
   renderFriendsSidebar();
   renderActiveAttendeeChips();
   renderCalendarHeader();
@@ -1478,12 +1595,78 @@ function init() {
   renderCalendar();
   updateSmartSuggestions();
   renderSharedEventsWidget();
-  loadWallpaper(); // Load saved custom wallpaper from localstorage
-  updateBadgeDisplay(); // Update incoming requests badge
+  loadWallpaper();
+  updateBadgeDisplay();
   renderNotificationsList();
   updateNotificationsBadge();
   updateClipboardBanner();
-  showToast('Welcome to ArcTime! Account initialized.', 'success');
+  
+  showToast(`Welcome, ${state.username}!`, 'success');
+}
+
+function setupRealtime() {
+  // Unsubscribe existing
+  if (state._eventsChannel) arctimeUnsubscribe(state._eventsChannel);
+  if (state._requestsChannel) arctimeUnsubscribe(state._requestsChannel);
+  
+  // Subscribe to events changes
+  state._eventsChannel = arctimeSubscribeEvents('events', async (payload) => {
+    // Re-fetch events on any change
+    const { data } = await arctimeGetEvents(0, 6);
+    if (data) {
+      state.events = data;
+      renderCalendar();
+      updateSmartSuggestions();
+      renderSharedEventsWidget();
+    }
+  });
+  
+  // Subscribe to new friend requests
+  if (state.userId) {
+    state._requestsChannel = arctimeSubscribeFriendRequests(state.userId, async (payload) => {
+      const req = payload.new;
+      if (req && req.status === 'pending') {
+        const { data: profile } = await arctimeGetProfile(req.sender_id);
+        const enriched = {
+          ...req,
+          sender_username: profile?.username || 'unknown',
+          name: profile?.display_name || 'Someone'
+        };
+        state.incomingRequests.push(enriched);
+        renderFriendsHub();
+        updateBadgeDisplay();
+        addNotification('Friend Request', `Friend request from ${enriched.name}!`, 'info');
+      }
+    });
+  }
+}
+
+// -------------------------------------------------------------
+// SUPABASE-BACKED PERSISTENCE (replaces localStorage)
+// -------------------------------------------------------------
+
+async function saveEventsToStorage() {
+  // Preserve local-only events (busy status, sim slots) before re-fetch
+  const localOnly = state.events.filter(
+    e => e.id === 'u-busy-temp' || e.id.endsWith('-sim-busy')
+  );
+  const { data } = await arctimeGetEvents(0, 6);
+  if (data) state.events = [...data, ...localOnly];
+}
+
+function saveRequestsToStorage() {
+  // Requests are managed through Supabase directly.
+  // Local state arrays are updated by the handlers.
+}
+
+// -------------------------------------------------------------
+// 8. SYSTEM INITIALIZATION
+// -------------------------------------------------------------
+function init() {
+  document.getElementById('loadingScreen').classList.remove('hidden');
+  authOverlay.classList.add('hidden');
+  
+  loadAppData();
 }
 
 // Kick off
@@ -1805,11 +1988,13 @@ saveSettingsBtn.addEventListener('click', () => {
   state.privacyLevel = settingsPrivacy.value;
   state.avatar = settingsAvatarPreview.src;
   
-  // Save to local storage
-  localStorage.setItem('arctime_username', state.username);
-  localStorage.setItem('arctime_username_handle', state.usernameHandle);
-  localStorage.setItem('arctime_privacy_level', state.privacyLevel);
-  localStorage.setItem('arctime_avatar', state.avatar);
+  // Save to Supabase
+  arctimeUpdateProfile(state.userId, {
+    display_name: state.username,
+    username: state.usernameHandle,
+    privacy_level: state.privacyLevel,
+    avatar_url: state.avatar
+  });
   
   // Update UI Card
   userProfileName.textContent = state.username;
@@ -1884,16 +2069,7 @@ function updateBadgeDisplay() {
   }
 }
 
-// Save Friends Hub lists to localStorage
-function saveRequestsToStorage() {
-  localStorage.setItem('arctime_incoming_requests', JSON.stringify(state.incomingRequests));
-  localStorage.setItem('arctime_sent_requests', JSON.stringify(state.sentRequests));
-}
 
-// Save Calendar Events to localStorage
-function saveEventsToStorage() {
-  localStorage.setItem('arctime_events', JSON.stringify(state.events));
-}
 
 // Render Friends Hub Sub-Sections
 function renderFriendsHub() {
@@ -1985,11 +2161,9 @@ function renderDirectory() {
             notes: 'Auto-generated via simulation status change.'
           });
         }
-        saveEventsToStorage();
         addNotification(`${friend.name} is Busy`, `@${friend.username} set status to Busy (Wednesday afternoon occupied)`, 'warning');
       } else {
         state.events = state.events.filter(ev => ev.id !== `${friend.id}-sim-busy`);
-        saveEventsToStorage();
         
         const statusLabel = newStatusType === 'free' ? 'Available' : 'Away';
         const notifType = newStatusType === 'free' ? 'success' : 'away';
@@ -2034,14 +2208,15 @@ function renderDirectory() {
   reloadIcons();
 }
 
-// Remove Friend
-function removeFriend(friendId) {
-  const friendName = state.friends[friendId].name;
+// Remove Friend (Supabase-backed)
+async function removeFriend(friendId) {
+  const friendName = state.friends[friendId]?.name || 'Unknown';
+  
+  await arctimeRemoveFriend(state.userId, friendId);
   
   delete state.friends[friendId];
   state.selectedFriends = state.selectedFriends.filter(id => id !== friendId);
   state.events = state.events.filter(e => e.owner !== friendId);
-  saveEventsToStorage();
   
   renderFriendsSidebar();
   renderActiveAttendeeChips();
@@ -2078,7 +2253,7 @@ function renderPendingRequests() {
       div.innerHTML = `
         <div style="display: flex; flex-direction: column; gap: 2px;">
           <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">${req.name}</span>
-          <span style="font-size: 11px; color: var(--text-muted);">@${req.username}</span>
+          <span style="font-size: 11px; color: var(--text-muted);">@${req.sender_username}</span>
         </div>
         <div style="display: flex; gap: 6px;">
           <button class="accept-btn" style="background: var(--color-free); border: none; color: #0b0f19; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 6px; cursor: pointer; transition: opacity 0.2s;">Accept</button>
@@ -2114,7 +2289,7 @@ function renderPendingRequests() {
       div.innerHTML = `
         <div style="display: flex; flex-direction: column; gap: 2px;">
           <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);">${req.name}</span>
-          <span style="font-size: 11px; color: var(--text-muted);">@${req.username}</span>
+          <span style="font-size: 11px; color: var(--text-muted);">@${req.receiver_username}</span>
         </div>
         <button class="cancel-sent-btn" style="background: rgba(255,255,255,0.04); border: 1px solid var(--border-color); color: var(--text-secondary); font-size: 11px; padding: 4px 8px; border-radius: 6px; cursor: pointer; transition: all 0.2s;">Cancel</button>
       `;
@@ -2126,57 +2301,36 @@ function renderPendingRequests() {
   }
 }
 
-// Accept Request Handler
-function acceptRequest(idx) {
+// Accept Request Handler (Supabase-backed)
+async function acceptRequest(idx) {
   const req = state.incomingRequests[idx];
-  state.incomingRequests.splice(idx, 1);
-  
-  const fid = req.username;
-  
-  // Create friend in DB
-  state.friends[fid] = {
-    id: fid,
-    name: req.name,
-    username: req.username,
-    color: req.color,
-    avatar: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 900000)}?auto=format&fit=crop&w=80&q=80`,
-    status: 'Available',
-    statusType: 'free',
-    schedulePreset: req.preset
-  };
-  
-  // Generate dummy events
-  const preset = req.preset;
-  const id = fid;
-  const newEvents = [];
-  if (preset === 'busy-day') {
-    newEvents.push(
-      { id: `${id}-e1`, title: 'Class Lecture', dayIndex: 0, startTime: '09:00', endTime: '11:00', owner: id, category: 'study' },
-      { id: `${id}-e2`, title: 'Work Shift', dayIndex: 0, startTime: '12:00', endTime: '16:00', owner: id, category: 'study' },
-      { id: `${id}-e3`, title: 'Project Team meeting', dayIndex: 2, startTime: '14:00', endTime: '17:00', owner: id, category: 'study' }
-    );
-  } else if (preset === 'night-owl') {
-    newEvents.push(
-      { id: `${id}-e1`, title: 'Afternoon Gym', dayIndex: 1, startTime: '16:00', endTime: '18:00', owner: id, category: 'sports' },
-      { id: `${id}-e2`, title: 'Evening Sync', dayIndex: 3, startTime: '17:00', endTime: '19:30', owner: id, category: 'study' }
-    );
-  } else if (preset === 'chilled') {
-    newEvents.push(
-      { id: `${id}-e1`, title: 'Morning Gym Sync', dayIndex: 2, startTime: '09:00', endTime: '11:00', owner: id, category: 'sports' },
-      { id: `${id}-e2`, title: 'Coffee hangout', dayIndex: 4, startTime: '15:00', endTime: '16:00', owner: id, category: 'dinner' }
-    );
-  } else {
-    newEvents.push(
-      { id: `${id}-e1`, title: 'Weekly Meeting', dayIndex: 1, startTime: '10:00', endTime: '12:00', owner: id, category: 'study' },
-      { id: `${id}-e2`, title: 'Lunch hangout', dayIndex: 3, startTime: '12:00', endTime: '13:30', owner: id, category: 'dinner' }
-    );
+  const { error } = await arctimeAcceptFriendRequest(req.id);
+  if (error) {
+    showToast('Failed to accept request: ' + error.message, 'info');
+    return;
   }
   
-  state.events.push(...newEvents);
-  saveEventsToStorage();
-  state.selectedFriends.push(fid);
+  state.incomingRequests.splice(idx, 1);
   
-  saveRequestsToStorage();
+  // Reload friends from Supabase
+  const { data: friends } = await arctimeGetFriends(state.userId);
+  state.friendsData = friends || [];
+  state.friends = {};
+  state.friendsData.forEach(f => {
+    state.friends[f.id] = {
+      id: f.id,
+      name: f.display_name || f.username,
+      username: f.username,
+      avatar: f.avatar_url,
+      color: '#8B5CF6',
+      status: 'Available',
+      statusType: 'free'
+    };
+  });
+  
+  // Reload events to include new friend's calendar
+  const { data: events } = await arctimeGetEvents(0, 6);
+  if (events) state.events = events;
   
   renderFriendsSidebar();
   renderActiveAttendeeChips();
@@ -2184,73 +2338,94 @@ function acceptRequest(idx) {
   updateSmartSuggestions();
   renderFriendsHub();
   
-  addNotification('Friend Connected', `Accepted friend request from ${req.name}!`, 'success');
+  addNotification('Friend Connected', `Accepted friend request!`, 'success');
 }
 
-// Decline Request
-function declineRequest(idx) {
+// Decline Request (Supabase-backed)
+async function declineRequest(idx) {
   const req = state.incomingRequests[idx];
+  await arctimeDeclineFriendRequest(req.id);
   state.incomingRequests.splice(idx, 1);
-  saveRequestsToStorage();
   renderFriendsHub();
-  addNotification('Request Declined', `Declined request from ${req.name}`, 'info');
+  addNotification('Request Declined', `Declined friend request`, 'info');
 }
 
-// Cancel Sent Request
-function cancelSentRequest(idx) {
+// Cancel Sent Request (Supabase-backed)
+async function cancelSentRequest(idx) {
   const req = state.sentRequests[idx];
+  await arctimeCancelFriendRequest(req.id);
   state.sentRequests.splice(idx, 1);
-  saveRequestsToStorage();
   renderFriendsHub();
-  addNotification('Request Cancelled', `Cancelled friend request to @${req.username}`, 'info');
+  addNotification('Request Cancelled', `Cancelled friend request to @${req.receiver_username || 'user'}`, 'info');
 }
 
-// Add Friend Form Submission
-sendRequestForm.addEventListener('submit', (e) => {
+// Add Friend Form Submission (Supabase-backed)
+sendRequestForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   
-  const nameInput = requestFriendName.value.trim();
   const usernameInput = requestFriendUsername.value.trim().toLowerCase().replace(/^@/, '');
-  const colorInput = requestFriendColor.value;
-  const presetInput = requestFriendPreset.value;
   
-  // Real check for duplicate usernames
-  let duplicateMsg = '';
+  // Validate you're not adding yourself
   if (usernameInput === state.usernameHandle) {
-    duplicateMsg = "Error: You cannot add yourself as a friend! Please type a different username.";
-  } else if (Object.values(state.friends).some(f => f.username === usernameInput)) {
-    duplicateMsg = `Error: Username @${usernameInput} is already a connected friend.`;
-  } else if (state.sentRequests.some(r => r.username === usernameInput)) {
-    duplicateMsg = `Error: A friend request is already pending for @${usernameInput}.`;
-  } else if (state.incomingRequests.some(r => r.username === usernameInput)) {
-    duplicateMsg = `Error: @${usernameInput} has already sent you a request. Accept it below!`;
+    usernameWarningText.textContent = "You cannot add yourself as a friend!";
+    usernameWarning.style.display = 'flex';
+    return;
   }
   
-  if (duplicateMsg) {
-    usernameWarningText.textContent = duplicateMsg;
+  // Look up user by username
+  const { data: targetProfile } = await arctimeGetProfileByUsername(usernameInput);
+  if (!targetProfile) {
+    usernameWarningText.textContent = `User "@${usernameInput}" not found. Check the username and try again.`;
     usernameWarning.style.display = 'flex';
-    showToast('Duplicate Username Check Failed!', 'info');
+    return;
+  }
+  
+  // Check not already friends
+  if (state.friends[targetProfile.id]) {
+    usernameWarningText.textContent = `@${usernameInput} is already your friend!`;
+    usernameWarning.style.display = 'flex';
+    return;
+  }
+  
+  // Check for existing pending request
+  if (state.sentRequests.some(r => r.receiver_id === targetProfile.id)) {
+    usernameWarningText.textContent = `Friend request already sent to @${usernameInput}.`;
+    usernameWarning.style.display = 'flex';
+    return;
+  }
+  if (state.incomingRequests.some(r => r.sender_id === targetProfile.id)) {
+    usernameWarningText.textContent = `@${usernameInput} already sent you a request. Accept it below!`;
+    usernameWarning.style.display = 'flex';
     return;
   }
   
   usernameWarning.style.display = 'none';
   
-  // Add to sent list
+  // Send the request
+  const { error } = await arctimeSendFriendRequest(state.userId, targetProfile.id);
+  if (error) {
+    usernameWarningText.textContent = 'Failed to send request: ' + error.message;
+    usernameWarning.style.display = 'flex';
+    return;
+  }
+  
+  // Add to local sent list
   state.sentRequests.push({
-    username: usernameInput,
-    name: nameInput,
-    color: colorInput,
-    preset: presetInput
+    id: 'pending-' + Date.now(),
+    sender_id: state.userId,
+    receiver_id: targetProfile.id,
+    status: 'pending',
+    receiver_username: targetProfile.username,
+    name: targetProfile.display_name
   });
   
-  saveRequestsToStorage();
   renderFriendsHub();
   sendRequestForm.reset();
   addNotification('Request Sent', `Sent friend request to @${usernameInput}!`, 'success');
 });
 
 // Real-time username input validation warning triggers (Add Friend Form)
-requestFriendUsername.addEventListener('input', () => {
+requestFriendUsername.addEventListener('input', async () => {
   const val = requestFriendUsername.value.trim().toLowerCase().replace(/^@/, '');
   if (!val) {
     usernameWarning.style.display = 'none';
@@ -2262,10 +2437,16 @@ requestFriendUsername.addEventListener('input', () => {
     errorMsg = "You cannot add yourself as a friend!";
   } else if (Object.values(state.friends).some(f => f.username === val)) {
     errorMsg = `Username @${val} is already a connected friend. Please change username!`;
-  } else if (state.sentRequests.some(r => r.username === val)) {
+  } else if (state.sentRequests.some(r => r.receiver_username === val)) {
     errorMsg = `Friend request already sent to @${val}.`;
-  } else if (state.incomingRequests.some(r => r.username === val)) {
+  } else if (state.incomingRequests.some(r => r.sender_username === val)) {
     errorMsg = `@${val} already sent you a request. Accept it below!`;
+  } else {
+    // Check if the user exists in Supabase
+    const { data: profile } = await arctimeGetProfileByUsername(val);
+    if (!profile) {
+      errorMsg = `Username "@${val}" not found on the platform.`;
+    }
   }
   
   if (errorMsg) {

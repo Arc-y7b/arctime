@@ -10,11 +10,77 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Supabase JS SDK -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="dark-mode">
   <div class="wallpaper-background-layer" id="wallpaperBgLayer"></div>
-  <div class="app-container">
+
+  <!-- Auth Overlay -->
+  <div class="auth-overlay" id="authOverlay">
+    <div class="auth-card" id="authCard">
+      <div class="auth-header">
+        <div class="auth-logo">
+          <i data-lucide="calendar-range"></i>
+        </div>
+        <h1 class="auth-title">arctime</h1>
+        <p class="auth-subtitle">Sync calendars, make memories together</p>
+      </div>
+
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="authTabLogin" data-mode="login">Sign In</button>
+        <button class="auth-tab" id="authTabSignup" data-mode="signup">Sign Up</button>
+      </div>
+
+      <!-- Login Form -->
+      <form id="loginForm" class="auth-form" style="display: block;">
+        <div class="auth-field">
+          <label for="loginEmail">Email</label>
+          <input type="email" id="loginEmail" placeholder="you@example.com" required class="auth-input">
+        </div>
+        <div class="auth-field">
+          <label for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" placeholder="••••••••" required class="auth-input" minlength="6">
+        </div>
+        <div id="loginError" class="auth-error"></div>
+        <button type="submit" class="auth-btn" id="loginBtn">Sign In</button>
+      </form>
+
+      <!-- Signup Form -->
+      <form id="signupForm" class="auth-form" style="display: none;">
+        <div class="auth-field">
+          <label for="signupEmail">Email</label>
+          <input type="email" id="signupEmail" placeholder="you@example.com" required class="auth-input">
+        </div>
+        <div class="auth-field">
+          <label for="signupPassword">Password</label>
+          <input type="password" id="signupPassword" placeholder="••••••••" required class="auth-input" minlength="6">
+        </div>
+        <div class="auth-field">
+          <label for="signupDisplayName">Display Name</label>
+          <input type="text" id="signupDisplayName" placeholder="Aarav Patel" required class="auth-input">
+        </div>
+        <div class="auth-field">
+          <label for="signupUsername">Username</label>
+          <div class="auth-username-wrap">
+            <span class="auth-at-sign">@</span>
+            <input type="text" id="signupUsername" placeholder="aarav" required class="auth-input" style="padding-left: 28px;">
+          </div>
+        </div>
+        <div id="signupError" class="auth-error"></div>
+        <button type="submit" class="auth-btn" id="signupBtn">Create Account</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Loading Screen -->
+  <div class="loading-screen" id="loadingScreen">
+    <div class="loading-spinner"></div>
+    <p class="loading-text">Loading ArcTime...</p>
+  </div>
+
+  <div class="app-container" id="appContainer" style="display: none;">
     <!-- Sidebar -->
     <aside class="sidebar">
       <div class="logo-area">
@@ -666,6 +732,7 @@
     </button>
   </div>
 
+  <script src="supabase.js"></script>
   <script type="module" src="app.js"></script>
 </body>
 </html>
