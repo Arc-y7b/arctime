@@ -114,3 +114,48 @@ Open `http://localhost:8000` in your web browser.
 If you run into `NetworkError` or `Cross-Origin Request Blocked` when calling Supabase endpoints, check the following:
 1. **Host URL Typo**: Verify that `SUPABASE_URL` in [supabase.js](file:///home/aarav/Projects/arctime/supabase.js) ends with `.supabase.co` (not `.sb.co`).
 2. **CORS Settings**: In the Supabase Dashboard, navigate to **Settings -> API** and verify that Allowed Web Origins includes your local addresses (`http://localhost:8000`, `http://127.0.0.1:8000`).
+
+---
+
+## Appendix: Feature Catalog & User Guide
+
+Here is a breakdown of all frontend features in ArcTime, how they behave, and how they map to your Supabase datastore:
+
+### 1. User Authentication & Session Persistence
+* **What it does**: Users register with email, password, username, and display name, and sign in. JWT tokens are automatically cached in `localStorage` by Supabase so sessions persist across refreshes.
+* **Database Mapping**: Auth credentials live in the protected `auth.users` table. The trigger function `on_auth_user_created` automatically populates the `public.profiles` table with matching user IDs and metadata.
+
+### 2. Month View Toggle (Status: Future Consideration)
+* **What it does**: You will notice the **Month** view button is currently disabled and shows a *"Month view coming soon"* tooltip on hover. 
+* **Database Mapping**: The month view requires client-side paginated queries to handle larger sets of events. This is listed under **Future Considerations** (Section 13 of [architecture.md](file:///home/aarav/Projects/arctime/docs/architecture.md)) and is not yet implemented. The calendar currently displays in a Weekly grid (Monday–Sunday).
+
+### 3. Availability status switcher ("Free / Busy")
+* **What it does**: A quick toggle in the sidebar to simulate or display your instant availability.
+  * **Selecting Busy**: Toggles `state.userAvailability` to `'busy'` and inserts a temporary, local-only calendar block (`u-busy-temp` titled *"User Blocked Time"* on Monday from 11:00 to 13:00) onto your weekly view. This allows you to quickly preview overlays and smart suggestions without writing to the database.
+  * **Selecting Free**: Resets status to `'free'` and clears the temporary block.
+* **Database Mapping**: Local-only client state. It does not write to the `events` table in Supabase. To create a permanent busy block, use the **Block Busy Slot** button.
+
+### 4. Week Switcher & Timezone Converter
+* **What it does**: Navigate weeks with arrows, reset with "Today". Toggle timezones between BST (GMT+1) and GMT.
+* **Database Mapping**: All calendar event start and end times are normalized and saved to the Supabase `events` table in **GMT**. Toggling the timezone switches display times in-place on the fly, ensuring cross-timezone groups stay perfectly synchronized.
+
+### 5. Quick Block ("Block Busy Slot") & Custom Booking Form
+* **What it does**: Clicking "Block Busy Slot" or clicking any empty cell on the grid opens the Booking Modal. Users can create personal events (busy blocks) or group activities (inviting attendees).
+* **Database Mapping**: Writing or updating events posts directly to the `events` table. If the event type is set to `group` and attendees are selected, rows are added to the `event_attendees` table. RLS policies ensure you can only edit or delete events that you own.
+
+### 6. Social Overlay (Friends Hub)
+* **What it does**: Search for users by username, send friend requests, and accept/decline incoming requests. Toggling friend checkboxes in the sidebar overlays their calendars on your weekly grid.
+* **Database Mapping**: Managed via `friend_requests` and `friendships` tables. Enabling a friend's overlay triggers a SELECT query on the `events` table (which is allowed by RLS because they are in your `friendships` table).
+
+### 7. Copy & Paste Slots
+* **What it does**: Clicking a card lets you "Copy" it. A floating clipboard banner appears at the bottom of the screen. Clicking another day or time on the grid lets you "Paste" the slot.
+* **Database Mapping**: The copied event metadata is stored in `localStorage` (`arctime_copied_event`). Pasting calculates the new time-offset in GMT and inserts a new event row into the `events` table.
+
+### 8. Smart Slot Finder
+* **What it does**: Select a duration (e.g., 1 hour) and click **Find Common Slots**. An interval-arithmetic scheduler computes all hours of the week where all checked friends and the host are free.
+* **Database Mapping**: Computes availability in-memory on the client by analyzing the union of all events currently fetched for you and your selected friends.
+
+### 9. Real-time Database Syncing
+* **What it does**: If a friend blocks a slot, sends you a request, or updates their schedule, the changes are propagated to your screen instantly without a page refresh.
+* **Database Mapping**: Secured by Supabase Realtime Channels (PostgreSQL changes replication). The browser client subscribes to WebSocket update notifications, which automatically trigger `renderCalendar()` and `updateSmartSuggestions()`.
+
