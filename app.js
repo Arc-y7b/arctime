@@ -1522,7 +1522,27 @@ async function loadAppData() {
   state.userId = session.user.id;
   
   // Load profile
-  const { data: profile } = await arctimeGetProfile(session.user.id);
+  let { data: profile } = await arctimeGetProfile(session.user.id);
+  
+  if (!profile) {
+    // Fail-safe: if profile doesn't exist in the database (e.g. registered before trigger activation),
+    // we create it now since we are logged in and RLS allows inserting our own profile.
+    const meta = session.user.user_metadata || {};
+    const fallbackDisplayName = meta.display_name || 'New User';
+    const fallbackUsername = meta.username || 'user_' + session.user.id.substring(0, 8);
+    
+    const { data: createdProfile } = await arctimeCreateProfile({
+      id: session.user.id,
+      display_name: fallbackDisplayName,
+      username: fallbackUsername,
+      avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
+      timezone: 'BST'
+    });
+    if (createdProfile) {
+      profile = createdProfile;
+    }
+  }
+
   if (profile) {
     state.username = profile.display_name || '';
     state.usernameHandle = profile.username || '';

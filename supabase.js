@@ -70,6 +70,15 @@ async function arctimeGetProfile(userId) {
   return { data, error };
 }
 
+async function arctimeCreateProfile(profile) {
+  const { data, error } = await sb
+    .from('profiles')
+    .insert(profile)
+    .select()
+    .single();
+  return { data, error };
+}
+
 async function arctimeUpdateProfile(userId, updates) {
   const { data, error } = await sb
     .from('profiles')
