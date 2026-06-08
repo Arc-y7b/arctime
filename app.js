@@ -67,6 +67,31 @@ function updateClipboardBanner() {
   }
 }
 
+function mapDbEventToAppEvent(dbEvent) {
+  if (!dbEvent) return null;
+  
+  let owner = 'user';
+  if (dbEvent.event_type === 'group') {
+    owner = 'shared';
+  } else if (dbEvent.user_id && dbEvent.user_id !== state.userId) {
+    owner = dbEvent.user_id;
+  }
+  
+  return {
+    id: dbEvent.id,
+    owner: owner,
+    title: dbEvent.title,
+    dayIndex: dbEvent.day_index,
+    startTime: dbEvent.start_time,
+    endTime: dbEvent.end_time,
+    category: dbEvent.category,
+    notes: dbEvent.notes,
+    eventType: dbEvent.event_type,
+    userId: dbEvent.user_id,
+    createdAt: dbEvent.created_at
+  };
+}
+
 // Time conversion: "HH:MM" -> minutes from midnight
 function timeToMinutes(timeStr) {
   const [hours, minutes] = timeStr.split(':').map(Number);
@@ -659,7 +684,7 @@ function renderCalendar() {
               showToast('Failed to paste slot: ' + pasteError.message, 'info');
               return;
             }
-            if (newEvent) state.events.push(newEvent);
+            if (newEvent) state.events.push(mapDbEventToAppEvent(newEvent));
             
             addNotification('Slot Pasted', `Pasted personal slot: "${state.copiedEvent.title}"`, 'success');
             
@@ -1552,7 +1577,7 @@ async function loadAppData() {
   
   // Load events (RLS returns own + friends' events)
   const { data: events } = await arctimeGetEvents(0, 6);
-  state.events = events || [];
+  state.events = events ? events.map(mapDbEventToAppEvent) : [];
   
   // Load friendships (get connected friends' profiles)
   const { data: friends } = await arctimeGetFriends(session.user.id);
@@ -1637,7 +1662,7 @@ function setupRealtime() {
     // Re-fetch events on any change
     const { data } = await arctimeGetEvents(0, 6);
     if (data) {
-      state.events = data;
+      state.events = data.map(mapDbEventToAppEvent);
       renderCalendar();
       updateSmartSuggestions();
       renderSharedEventsWidget();
@@ -1674,7 +1699,7 @@ async function saveEventsToStorage() {
     e => e.id === 'u-busy-temp' || e.id.endsWith('-sim-busy')
   );
   const { data } = await arctimeGetEvents(0, 6);
-  if (data) state.events = [...data, ...localOnly];
+  if (data) state.events = [...data.map(mapDbEventToAppEvent), ...localOnly];
 }
 
 function saveRequestsToStorage() {
