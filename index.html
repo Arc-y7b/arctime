@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ArcTime — Sync calendars, make memories together</title>
+  <!-- Google Fonts: Inter & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-mode">
+  <div class="wallpaper-background-layer" id="wallpaperBgLayer"></div>
+  <div class="app-container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="logo-area">
+        <div class="logo-icon">
+          <i data-lucide="calendar-range"></i>
+        </div>
+        <span class="logo-text">arctime</span>
+      </div>
+
+      <!-- User Profile Card -->
+      <div class="profile-card" id="userProfileCard" title="Click to edit profile settings" style="cursor: pointer; transition: all 0.2s;">
+        <div class="avatar-wrapper">
+          <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80" alt="Your Avatar" class="user-avatar" id="userProfileAvatar">
+          <span class="status-dot online"></span>
+        </div>
+        <div class="profile-info">
+          <span class="profile-name" id="userProfileName">Aarav Patel</span>
+          <span class="profile-tag">You (Host)</span>
+        </div>
+      </div>
+
+      <!-- Quick Status -->
+      <div class="status-selector" style="margin-bottom: 16px;">
+        <span class="section-title">My Availability</span>
+        <div class="status-options">
+          <button class="status-btn active" data-status="free">
+            <span class="dot free"></span> Free
+          </button>
+          <button class="status-btn" data-status="busy">
+            <span class="dot busy"></span> Busy
+          </button>
+        </div>
+        <button class="add-busy-slot-btn" id="openPersonalBookingBtn" style="width: 100%; margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 8px; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.2); color: #ef4444; padding: 10px 16px; border-radius: 12px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.2s;">
+          <i data-lucide="plus-circle" style="width: 16px; height: 16px;"></i> Block Busy Slot
+        </button>
+      </div>
+
+      <!-- Friends Calendar Toggle Section -->
+      <div class="friends-section">
+        <div class="section-header">
+          <span class="section-title">Friends' Calendars</span>
+          <button class="add-friend-btn" id="openAddFriendModalBtn" title="Add a Friend">
+            <i data-lucide="plus-circle"></i>
+          </button>
+        </div>
+        <p class="section-subtitle">Toggle to overlay calendars on grid</p>
+        <div class="friends-list" id="friendsListContainer">
+          <!-- Friends will be dynamically rendered here -->
+        </div>
+      </div>
+
+      <!-- Settings Panel Trigger -->
+      <div class="settings-section" style="margin-bottom: 24px;">
+        <button class="settings-trigger-btn" id="openSettingsBtn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 10px 16px; border-radius: 12px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.2s;">
+          <i data-lucide="settings" style="width: 16px; height: 16px;"></i> Settings & Wallpaper
+        </button>
+      </div>
+
+      <!-- App Tips / Simulation Info -->
+      <div class="sidebar-footer">
+        <div class="sim-card">
+          <div class="sim-title">
+            <i data-lucide="info" class="info-icon"></i>
+            <span>Simulation Active</span>
+          </div>
+          <p class="sim-text">Toggle calendars to overlay busy slots. Click any slot or use the Scheduler to find common free times.</p>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Top Navbar -->
+      <header class="navbar">
+        <div class="nav-left">
+          <h1 class="current-date" id="currentDateDisplay">June 2026</h1>
+          <div class="nav-controls">
+            <button class="nav-arrow-btn" id="prevWeekBtn" title="Previous Week">
+              <i data-lucide="chevron-left"></i>
+            </button>
+            <button class="today-btn" id="todayBtn">Today</button>
+            <button class="nav-arrow-btn" id="nextWeekBtn" title="Next Week">
+              <i data-lucide="chevron-right"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Segmented Tab Navigation -->
+        <div class="app-mode-toggles" style="display: flex; background: var(--bg-surface); border: 1px solid var(--border-color); padding: 3px; border-radius: 12px; gap: 4px;">
+          <button class="mode-btn active" id="showCalendarBtn" style="background: rgba(255, 255, 255, 0.08); border: none; color: var(--text-primary); padding: 6px 14px; border-radius: 9px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s;">
+            <i data-lucide="calendar" style="width: 14px; height: 14px;"></i> Calendar
+          </button>
+          <button class="mode-btn" id="showFriendsHubBtn" style="background: none; border: none; color: var(--text-secondary); padding: 6px 14px; border-radius: 9px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s; position: relative;">
+            <i data-lucide="users" style="width: 14px; height: 14px;"></i> Friends Hub
+            <span class="badge" id="pendingRequestsBadge" style="background: #ef4444; color: white; font-size: 10px; font-weight: 700; width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: absolute; top: -5px; right: -5px; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);">1</span>
+          </button>
+        </div>
+
+        <div class="nav-right">
+          <!-- View Modes -->
+          <div class="view-toggles">
+            <button class="view-btn active" data-view="week">Week</button>
+            <button class="view-btn" data-view="month" disabled title="Month view coming soon">Month</button>
+          </div>
+          <!-- Timezone Switcher -->
+          <div class="timezone-selector" title="Timezone Mode">
+            <i data-lucide="globe"></i>
+            <select id="timezoneSelect" class="timezone-select">
+              <option value="BST" selected>BST (GMT+1)</option>
+              <option value="GMT">GMT (UTC+0)</option>
+            </select>
+          </div>
+          <!-- Global Sync Checkbox -->
+          <button class="sync-overlay-btn active" id="toggleCommonFreeHighlight" title="Highlight Common Free Slots">
+            <i data-lucide="sparkles"></i>
+            <span>Highlight Overlaps</span>
+          </button>
+          <!-- Notification Bell -->
+          <button class="nav-bell-btn" id="openNotificationsBtn" title="Notification Log" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-secondary); width: 36px; height: 36px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; position: relative; transition: all 0.2s; padding: 0;">
+            <i data-lucide="bell" style="width: 16px; height: 16px;"></i>
+            <span class="bell-badge" id="notificationsBadge" style="background: #ef4444; color: white; font-size: 10px; font-weight: 700; width: 15px; height: 15px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: absolute; top: -4px; right: -4px; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);">2</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Calendar Container -->
+      <div class="calendar-wrapper" id="calendarWrapper">
+        <!-- Calendar Grid -->
+        <div class="calendar-grid-container">
+          <!-- Time Grid Header -->
+          <div class="calendar-grid-header" id="calendarGridHeader">
+            <div class="time-col-header"></div>
+            <!-- Mon-Sun headers rendered by JavaScript -->
+          </div>
+
+          <!-- Calendar Body -->
+          <div class="calendar-grid-body-scroll">
+            <div class="calendar-grid-body" id="calendarGridBody">
+              <!-- Time Column Labels -->
+              <div class="time-column" id="timeLabelsColumn">
+                <!-- 8 AM to 8 PM labels generated by JS -->
+              </div>
+              
+              <!-- Grid columns for days -->
+              <div class="days-columns-wrapper" id="daysColumnsWrapper">
+                <!-- Day columns containing hours and overlay elements -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Friends Hub Container -->
+      <div class="friends-hub-wrapper" id="friendsHubWrapper" style="display: none; flex-grow: 1; padding: 24px; overflow-y: auto;">
+        <div class="friends-hub-grid" style="display: grid; grid-template-columns: 1fr 340px; gap: 24px; height: 100%; align-items: start;">
+          
+          <!-- Left Area: Add Friend & Pending Requests -->
+          <div class="hub-left-col" style="display: flex; flex-direction: column; gap: 24px;">
+            
+            <!-- Add Friend Form -->
+            <div class="hub-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 18px; padding: 24px; box-shadow: var(--shadow-lg);">
+              <h2 style="font-family: var(--font-title); font-size: 18px; font-weight: 700; color: var(--text-primary); margin: 0 0 6px 0; display: flex; align-items: center; gap: 10px;">
+                <i data-lucide="user-plus" style="color: var(--accent-primary); width: 20px; height: 20px;"></i>
+                <span>Add Friend by Username</span>
+              </h2>
+              <p style="font-size: 12px; color: var(--text-secondary); margin: 0 0 20px 0;">Send a request to sync schedules. Usernames must be unique.</p>
+              
+              <form id="sendRequestForm" style="display: flex; flex-direction: column; gap: 16px;">
+                <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                  <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                    <label for="requestFriendName" style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted);">Full Name</label>
+                    <input type="text" id="requestFriendName" placeholder="e.g. Liam Johnson" required class="form-input" style="background: #090a10; border: 1px solid var(--border-color); color: var(--text-primary); padding: 10px; border-radius: 8px; font-size: 13px;">
+                  </div>
+                  <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                    <label for="requestFriendUsername" style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted);">Username</label>
+                    <div style="position: relative;">
+                      <span style="position: absolute; left: 10px; top: 10px; color: var(--text-muted); font-size: 13px; font-weight: 600;">@</span>
+                      <input type="text" id="requestFriendUsername" placeholder="liam" required class="form-input" style="background: #090a10; border: 1px solid var(--border-color); color: var(--text-primary); padding: 10px 10px 10px 24px; border-radius: 8px; font-size: 13px; width: 100%;">
+                    </div>
+                  </div>
+                </div>
+
+                <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                  <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                    <label for="requestFriendColor" style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted);">Theme Color</label>
+                    <select id="requestFriendColor" class="form-select" style="background: #090a10; border: 1px solid var(--border-color); color: var(--text-primary); padding: 10px; border-radius: 8px; font-size: 13px;">
+                      <option value="#EC4899">Hot Pink</option>
+                      <option value="#10B981">Emerald Green</option>
+                      <option value="#8B5CF6">Purple Accent</option>
+                      <option value="#F59E0B">Amber Orange</option>
+                      <option value="#E11D48">Crimson Red</option>
+                      <option value="#06B6D4">Bright Cyan</option>
+                    </select>
+                  </div>
+                  <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                    <label for="requestFriendPreset" style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted);">Timetable Preset</label>
+                    <select id="requestFriendPreset" class="form-select" style="background: #090a10; border: 1px solid var(--border-color); color: var(--text-primary); padding: 10px; border-radius: 8px; font-size: 13px;">
+                      <option value="busy-day">Very Busy (Class + Job)</option>
+                      <option value="night-owl">Night Owl (Morning Free, Evening Busy)</option>
+                      <option value="chilled" selected>Chilled Out (Available slots)</option>
+                      <option value="erratic">Erratic (Scattered schedules)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Validation Warning Block -->
+                <div id="usernameWarning" style="display: none; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); color: #f87171; font-size: 12px; padding: 10px 14px; border-radius: 8px; align-items: center; gap: 8px; font-weight: 500;">
+                  <i data-lucide="alert-circle" style="width: 16px; height: 16px; flex-shrink: 0;"></i>
+                  <span id="usernameWarningText">Username already taken. Please choose a unique one.</span>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="display: flex; align-items: center; justify-content: center; gap: 8px; height: 42px; font-weight: 600;">
+                  <i data-lucide="send" style="width: 16px; height: 16px;"></i> Send Friend Request
+                </button>
+              </form>
+            </div>
+
+            <!-- Pending Requests Card -->
+            <div class="hub-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 18px; padding: 24px; box-shadow: var(--shadow-lg);">
+              <h2 style="font-family: var(--font-title); font-size: 18px; font-weight: 700; color: var(--text-primary); margin: 0 0 6px 0; display: flex; align-items: center; gap: 10px;">
+                <i data-lucide="clock" style="color: var(--accent-primary); width: 20px; height: 20px;"></i>
+                <span>Pending Requests</span>
+              </h2>
+              <p style="font-size: 12px; color: var(--text-secondary); margin: 0 0 16px 0;">Accept incoming invitations or manage your sent requests.</p>
+              
+              <div class="requests-lists-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <!-- Incoming Requests -->
+                <div>
+                  <h4 style="font-size: 12px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; margin: 0 0 10px 0; letter-spacing: 0.5px;">Incoming</h4>
+                  <div class="requests-list" id="incomingRequestsContainer" style="display: flex; flex-direction: column; gap: 8px;">
+                    <!-- Rendered by JS -->
+                  </div>
+                </div>
+                <!-- Sent Requests -->
+                <div>
+                  <h4 style="font-size: 12px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; margin: 0 0 10px 0; letter-spacing: 0.5px;">Sent</h4>
+                  <div class="requests-list" id="sentRequestsContainer" style="display: flex; flex-direction: column; gap: 8px;">
+                    <!-- Rendered by JS -->
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Right Area: Friends List Directory -->
+          <div class="hub-right-col" style="height: 100%;">
+            <div class="hub-card" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 18px; padding: 24px; box-shadow: var(--shadow-lg); min-height: 480px;">
+              <h2 style="font-family: var(--font-title); font-size: 18px; font-weight: 700; color: var(--text-primary); margin: 0 0 6px 0; display: flex; align-items: center; gap: 10px;">
+                <i data-lucide="contact" style="color: var(--accent-primary); width: 20px; height: 20px;"></i>
+                <span>Friends Directory</span>
+              </h2>
+              <p style="font-size: 12px; color: var(--text-secondary); margin: 0 0 20px 0;">Connected friends sharing schedules with you.</p>
+              
+              <div class="directory-list" id="directoryContainer" style="display: flex; flex-direction: column; gap: 10px; max-height: 480px; overflow-y: auto; padding-right: 4px;">
+                <!-- Rendered by JS -->
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </main>
+
+    <!-- Right Scheduler Panel -->
+    <aside class="scheduler-panel">
+      <div class="panel-section">
+        <h2 class="panel-heading">
+          <i data-lucide="wand2"></i>
+          <span>Smart Slot Finder</span>
+        </h2>
+        <p class="panel-subheading">Auto-calculate ideal slots for everyone active</p>
+        
+        <div class="scheduler-config">
+          <div class="config-group">
+            <label for="durationSelect">Event Duration</label>
+            <select id="durationSelect" class="form-select">
+              <option value="60">1 Hour</option>
+              <option value="30">30 Minutes</option>
+              <option value="90">1.5 Hours</option>
+              <option value="120">2 Hours</option>
+            </select>
+          </div>
+          
+          <div class="config-group">
+            <label>Active Coordination</label>
+            <div class="active-attendees-chips" id="activeAttendeesList">
+              <!-- Rendered by JS based on toggled friends -->
+            </div>
+          </div>
+        </div>
+
+        <button class="calculate-btn" id="findTimesBtn">
+          <i data-lucide="zap"></i> Find Common Slots
+        </button>
+
+        <!-- Suggested slots results -->
+        <div class="suggestions-container">
+          <span class="section-title">Recommended Times</span>
+          <div class="suggestions-list" id="suggestionsList">
+            <!-- Dynamic suggestion cards -->
+            <div class="no-selections">Select friends and click "Find Common Slots"</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Upcoming Shared Events -->
+      <div class="panel-section upcoming-events-section">
+        <h2 class="panel-heading">
+          <i data-lucide="users"></i>
+          <span>Shared Plans</span>
+        </h2>
+        <div class="shared-events-list" id="sharedEventsList">
+          <!-- Booked events displayed here -->
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Book Event Modal -->
+  <div class="modal-backdrop" id="bookingModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Book Group Activity</h3>
+        <button class="close-modal-btn" id="closeBookingModalBtn">&times;</button>
+      </div>
+      <form id="bookingForm" class="modal-form">
+        <div class="form-group">
+          <label>Event Type</label>
+          <div style="display: flex; gap: 16px; margin-top: 4px;">
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; cursor: pointer; color: var(--text-primary);">
+              <input type="radio" name="eventType" value="personal" checked style="accent-color: var(--accent-primary);">
+              Personal Busy Time 🔒
+            </label>
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; cursor: pointer; color: var(--text-primary);">
+              <input type="radio" name="eventType" value="group" style="accent-color: var(--accent-primary);">
+              Group Activity 🍿
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="eventTitle">Activity Name</label>
+          <input type="text" id="eventTitle" placeholder="e.g., Study Session, Gym, Dentist, Work" required class="form-input">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="eventDate">Date</label>
+            <input type="date" id="eventDate" required class="form-input">
+          </div>
+          <div class="form-group">
+            <label for="eventStartTime">Start Time</label>
+            <input type="time" id="eventStartTime" required class="form-input">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="eventDuration">Duration (minutes)</label>
+            <input type="number" id="eventDuration" value="60" min="5" max="1440" required class="form-input" style="background: #090a10; border: 1px solid var(--border-color); color: var(--text-primary); padding: 10px; border-radius: 8px; font-size: 13px; width: 100%;">
+          </div>
+          <div class="form-group">
+            <label for="eventCategory">Category</label>
+            <select id="eventCategory" class="form-select">
+              <option value="study">Study 📚</option>
+              <option value="hangout">Hangout 🍿</option>
+              <option value="dinner">Meal / Drinks 🍔</option>
+              <option value="sports">Fitness / Sports ⚽</option>
+              <option value="gaming">Gaming 🎮</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group" id="invitedFriendsGroup" style="display: none;">
+          <label>Invited Friends</label>
+          <div class="friend-checkboxes" id="modalFriendsCheckboxContainer">
+            <!-- Dynamic checklist -->
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="eventNotes">Notes</label>
+          <textarea id="eventNotes" placeholder="Add location, link, or details..." class="form-input form-textarea" rows="2"></textarea>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="cancelBookingBtn">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="submitBookingBtn">Save Event</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Friend Modal -->
+  <div class="modal-backdrop" id="addFriendModal">
+    <div class="modal-card mini-modal">
+      <div class="modal-header">
+        <h3>Add Friend to ArcTime</h3>
+        <button class="close-modal-btn" id="closeAddFriendModalBtn">&times;</button>
+      </div>
+      <form id="addFriendForm" class="modal-form">
+        <div class="form-group">
+          <label for="friendName">Friend's Name</label>
+          <input type="text" id="friendName" placeholder="e.g. Liam Johnson" required class="form-input">
+        </div>
+        <div class="form-group">
+          <label for="friendColor">Signature Theme Color</label>
+          <select id="friendColor" class="form-select">
+            <option value="#EC4899">Hot Pink</option>
+            <option value="#10B981">Emerald Green</option>
+            <option value="#8B5CF6">Purple Accent</option>
+            <option value="#F59E0B">Amber Orange</option>
+            <option value="#E11D48">Crimson Red</option>
+            <option value="#06B6D4">Bright Cyan</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="friendSchedulePreset">Calendar Preset</label>
+          <select id="friendSchedulePreset" class="form-select">
+            <option value="busy-day">Very Busy (Class + Part-time job)</option>
+            <option value="night-owl">Night Owl (Free mornings, busy nights)</option>
+            <option value="chilled">Chilled Out (Open slots, gym enthusiast)</option>
+            <option value="erratic">Erratic (Scattered schedules)</option>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="cancelAddFriendBtn">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add Friend & Load Calendar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Crop Image Modal -->
+  <div class="modal-backdrop" id="cropModal" style="z-index: 110;">
+    <div class="modal-card mini-modal">
+      <div class="modal-header">
+        <h3>Crop Profile Picture</h3>
+        <button class="close-modal-btn" id="closeCropModalBtn">&times;</button>
+      </div>
+      <div class="modal-form" style="padding: 24px; display: flex; flex-direction: column; align-items: center; gap: 20px;">
+        <div class="crop-workspace" id="cropWorkspace" style="position: relative; width: 260px; height: 260px; background: #07080d; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); cursor: move;">
+          <!-- Image to be dragged -->
+          <img id="cropSourceImage" src="" style="position: absolute; transform-origin: center; user-select: none; -webkit-user-drag: none; top: 0; left: 0;">
+          <!-- Circular overlay mask -->
+          <div class="crop-mask" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; border: 30px solid rgba(0, 0, 0, 0.7); pointer-events: none;"></div>
+          <div class="crop-mask-circle" style="position: absolute; top: 30px; left: 30px; width: 200px; height: 200px; border-radius: 50%; border: 2px dashed rgba(255, 255, 255, 0.5); pointer-events: none; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);"></div>
+        </div>
+        
+        <!-- Zoom Slider -->
+        <div style="width: 100%; display: flex; flex-direction: column; gap: 8px;">
+          <label style="font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Zoom</label>
+          <input type="range" id="cropZoomSlider" min="100" max="300" value="100" style="width: 100%; accent-color: var(--accent-primary);">
+        </div>
+        
+        <div class="modal-actions" style="width: 100%; display: flex; gap: 12px;">
+          <button type="button" class="btn btn-secondary" id="cancelCropBtn" style="flex-grow: 1;">Cancel</button>
+          <button type="button" class="btn btn-primary" id="applyCropBtn" style="flex-grow: 1;">Apply Crop</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Event Action Modal -->
+  <div class="modal-backdrop" id="eventActionModal" style="z-index: 120;">
+    <div class="modal-card mini-modal">
+      <div class="modal-header">
+        <h3 id="eventActionModalTitle">Manage Event</h3>
+        <button class="close-modal-btn" id="closeEventActionModalBtn">&times;</button>
+      </div>
+      <div class="modal-form" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+        <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); padding: 14px; border-radius: 12px; display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <span id="eventActionCategoryBadge" class="badge" style="font-size: 10px; padding: 4px 8px; border-radius: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Busy</span>
+            <span id="eventActionOwner" style="font-size: 11px; font-weight: 600; color: var(--text-muted);">You</span>
+          </div>
+          <h4 id="eventActionTitleText" style="font-size: 16px; font-weight: 700; color: var(--text-primary); margin: 4px 0 0 0;">Event Title</h4>
+          <p id="eventActionTimeText" style="font-size: 12px; color: var(--text-secondary); margin: 0; display: flex; align-items: center; gap: 6px;">
+            <i data-lucide="clock" style="width: 14px; height: 14px; color: var(--accent-primary);"></i>
+            <span>Monday, 10:00 AM - 11:00 AM</span>
+          </p>
+          <p id="eventActionNotesText" style="font-size: 12px; color: var(--text-muted); margin: 4px 0 0 0; font-style: italic; border-top: 1px dashed var(--border-light); padding-top: 8px; display: none;"></p>
+        </div>
+        
+        <div class="modal-actions" style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
+          <button type="button" class="btn btn-primary" id="eventActionEditBtn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; background: var(--accent-primary); border-color: var(--accent-primary); color: white;">
+            <i data-lucide="edit-3" style="width: 16px; height: 16px;"></i> Edit Event Details
+          </button>
+          <button type="button" class="btn btn-primary" id="eventActionCopyBtn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <i data-lucide="copy" style="width: 16px; height: 16px;"></i> Copy to Clipboard
+          </button>
+          <button type="button" class="btn btn-primary" id="eventActionCancelSharedBtn" style="width: 100%; display: none; align-items: center; justify-content: center; gap: 8px; background: #ef4444; border-color: #dc2626; color: white;">
+            <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i> Cancel Shared Event
+          </button>
+          <button type="button" class="btn btn-secondary" id="eventActionDeleteBtn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.2); color: #ef4444;">
+            <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i> Delete Personal Slot
+          </button>
+          <button type="button" class="btn btn-secondary" id="eventActionCloseBtn" style="width: 100%;">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Paste Action Modal -->
+  <div class="modal-backdrop" id="pasteActionModal" style="z-index: 120;">
+    <div class="modal-card mini-modal">
+      <div class="modal-header">
+        <h3>Paste Busy Slot</h3>
+        <button class="close-modal-btn" id="closePasteActionModalBtn">&times;</button>
+      </div>
+      <div class="modal-form" style="padding: 24px; display: flex; flex-direction: column; gap: 16px; align-items: center; text-align: center;">
+        <div style="background: rgba(6, 182, 212, 0.08); border: 1px solid rgba(6, 182, 212, 0.2); width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--accent-primary);">
+          <i data-lucide="clipboard" style="width: 24px; height: 24px;"></i>
+        </div>
+        <div>
+          <p style="font-size: 14px; color: var(--text-primary); margin: 0 0 6px 0;">
+            Would you like to paste your copied slot <strong id="pasteActionSlotTitle" style="color: var(--accent-primary);">Busy</strong> here?
+          </p>
+          <p style="font-size: 12px; color: var(--text-secondary); margin: 0;" id="pasteActionTimeText">
+            Target time: 10:00 AM (Monday)
+          </p>
+        </div>
+        <div class="modal-actions" style="display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 10px;">
+          <button type="button" class="btn btn-primary" id="pasteActionConfirmBtn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <i data-lucide="check" style="width: 16px; height: 16px;"></i> Paste Slot Here
+          </button>
+          <button type="button" class="btn btn-secondary" id="pasteActionNewBtn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <i data-lucide="plus" style="width: 16px; height: 16px;"></i> Book New Event Instead
+          </button>
+          <button type="button" class="btn btn-secondary" id="pasteActionCancelBtn" style="width: 100%;">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Center Drawer slide-out -->
+  <div class="notifications-drawer-backdrop" id="notificationsDrawerBackdrop"></div>
+  <div class="notifications-drawer" id="notificationsDrawer">
+    <div class="drawer-header" style="padding: 20px 24px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+      <h3 style="font-family: var(--font-title); font-size: 18px; font-weight: 700; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 8px;">
+        <i data-lucide="bell" style="width: 18px; height: 18px; color: var(--accent-primary);"></i> Notification Center
+      </h3>
+      <button class="close-drawer-btn" id="closeNotificationsBtn" style="background: none; border: none; color: var(--text-secondary); font-size: 24px; cursor: pointer; transition: color 0.2s;">&times;</button>
+    </div>
+    <div class="drawer-content" style="padding: 24px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+        <span style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); letter-spacing: 0.5px;">Activity Feed</span>
+        <button id="clearNotificationsBtn" style="background: none; border: none; color: var(--color-busy); font-size: 11px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px;">Clear All</button>
+      </div>
+      <div class="notifications-list" id="notificationsContainer" style="display: flex; flex-direction: column; gap: 10px; max-height: 520px; overflow-y: auto; padding-right: 2px;">
+        <!-- Dynamic notification cards -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Drawer slide-out -->
+  <div class="settings-drawer-backdrop" id="settingsDrawerBackdrop"></div>
+  <div class="settings-drawer" id="settingsDrawer">
+    <div class="drawer-header" style="padding: 20px 24px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+      <h3 style="font-family: var(--font-title); font-size: 18px; font-weight: 700; color: var(--text-primary); margin: 0;">App Settings</h3>
+      <button class="close-drawer-btn" id="closeSettingsBtn" style="background: none; border: none; color: var(--text-secondary); font-size: 24px; cursor: pointer; transition: color 0.2s;">&times;</button>
+    </div>
+    <div class="drawer-content" style="padding: 24px; display: flex; flex-direction: column; gap: 20px;">
+      <!-- Profile Picture -->
+      <div class="settings-group" style="display: flex; flex-direction: column; gap: 8px;">
+        <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted);">Profile Picture</label>
+        <div class="avatar-edit-wrapper" style="display: flex; align-items: center; gap: 16px;">
+          <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80" alt="Avatar Preview" id="settingsAvatarPreview" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(255, 255, 255, 0.1);">
+          <button type="button" class="btn btn-secondary" id="triggerAvatarUploadBtn" style="display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 8px 12px;">
+            <i data-lucide="camera" style="width: 14px; height: 14px;"></i> Upload Photo
+          </button>
+          <input type="file" id="avatarInput" accept="image/*" style="display: none;">
+        </div>
+      </div>
+
+      <!-- Username -->
+      <div class="settings-group" style="display: flex; flex-direction: column; gap: 6px;">
+        <label for="settingsUsername" style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted);">Display Name</label>
+        <input type="text" id="settingsUsername" value="Aarav Patel" class="form-input" placeholder="Your name">
+      </div>
+
+      <!-- Unique Username Handle -->
+      <div class="settings-group" style="display: flex; flex-direction: column; gap: 6px;">
+        <label for="settingsUserUsername" style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted);">Username Handle</label>
+        <div style="position: relative;">
+          <span style="position: absolute; left: 12px; top: 10px; color: var(--text-muted); font-size: 13px; font-weight: 600;">@</span>
+          <input type="text" id="settingsUserUsername" value="aarav" class="form-input" placeholder="username" style="padding-left: 26px; width: 100%;">
+        </div>
+        <div id="settingsUsernameWarning" style="display: none; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); color: #f87171; font-size: 11px; padding: 6px 10px; border-radius: 6px; align-items: center; gap: 6px; font-weight: 500; margin-top: 4px;">
+          <i data-lucide="alert-circle" style="width: 14px; height: 14px; flex-shrink: 0;"></i>
+          <span>Username taken! Choose a unique handle.</span>
+        </div>
+      </div>
+
+      <!-- Timetable Access Level Privacy -->
+      <div class="settings-group" style="display: flex; flex-direction: column; gap: 6px;">
+        <label for="settingsPrivacy" style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted);">Timetable Access Level</label>
+        <p style="font-size: 11px; color: var(--text-muted); margin: 0 0 4px 0;">Control what details friends see on your schedule.</p>
+        <select id="settingsPrivacy" class="form-select">
+          <option value="full">Show Full Details (Title & Notes)</option>
+          <option value="freebusy" selected>Show Free/Busy Only</option>
+          <option value="private">Hide Calendar (Private)</option>
+        </select>
+      </div>
+
+      <!-- Wallpaper Customization -->
+      <div class="settings-group" style="display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--border-light); padding-top: 16px;">
+        <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted);">Chat Wallpaper</label>
+        <div class="wallpaper-controls" style="display: flex; gap: 8px; margin-bottom: 8px;">
+          <button class="wallpaper-btn" id="uploadWallpaperBtn" style="flex-grow: 1; display: flex; align-items: center; justify-content: center; gap: 8px; background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px 12px; border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.2s;">
+            <i data-lucide="image" style="width: 16px; height: 16px;"></i> Custom Wallpaper
+          </button>
+          <input type="file" id="wallpaperInput" accept="image/*" style="display: none;">
+          <button class="reset-wallpaper-btn" id="resetWallpaperBtn" title="Reset Wallpaper" style="display: none; width: 36px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.25); color: #ef4444; border-radius: 10px; cursor: pointer; align-items: center; justify-content: center; transition: all 0.2s;">
+            <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+          </button>
+        </div>
+        <div class="wallpaper-adjusters" id="wallpaperAdjusters" style="display: none; flex-direction: column; gap: 8px; background: rgba(0, 0, 0, 0.2); padding: 10px; border-radius: 10px; border: 1px solid var(--border-color);">
+          <div class="slider-group" style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+            <label for="wallpaperOpacity" style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Dimness</label>
+            <input type="range" id="wallpaperOpacity" min="5" max="95" value="30" style="flex-grow: 1; accent-color: var(--accent-primary);">
+          </div>
+          <div class="slider-group" style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+            <label for="wallpaperBlur" style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Blur</label>
+            <input type="range" id="wallpaperBlur" min="0" max="10" value="0" style="flex-grow: 1; accent-color: var(--accent-primary);">
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 12px; margin-top: 10px;">
+        <button class="btn btn-secondary" id="cancelSettingsBtn" style="flex-grow: 1;">Cancel</button>
+        <button class="btn btn-primary" id="saveSettingsBtn" style="flex-grow: 1;">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Floating Clipboard Paste Banner -->
+  <div class="clipboard-banner" id="clipboardBanner">
+    <div class="clipboard-banner-content">
+      <i data-lucide="clipboard" class="clipboard-icon" style="width: 16px; height: 16px;"></i>
+      <span>Copied: <strong id="clipboardEventTitle">Busy Slot</strong></span>
+    </div>
+    <button class="clipboard-clear-btn" id="clearClipboardBtn" title="Clear Clipboard">
+      <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+    </button>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
