@@ -3,7 +3,7 @@
  * All browser-side queries use the anon key — RLS enforces permissions.
  */
 
-const SUPABASE_URL = 'https://bszdmkydzzujvctgihqk.sb.co';
+const SUPABASE_URL = 'https://bszdmkydzzujvctgihqk.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_Wyo_dz2gBAhc6Xg46R8qvg_UPRLIS73';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
