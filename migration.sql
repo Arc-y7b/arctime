@@ -1,8 +1,13 @@
 -- ============================================================
 -- ArcTime Database Schema — Run this in Supabase SQL Editor
 -- ============================================================
+-- Create all tables first, then add policies to avoid
+-- "relation does not exist" errors on forward references.
+-- ============================================================
 
--- 1. PROFILES
+-- 1. CREATE ALL TABLES
+-- ============================================================
+
 CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   username TEXT UNIQUE,
@@ -12,16 +17,6 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "profiles_read_all" ON public.profiles
-  FOR SELECT USING (true);
-CREATE POLICY "profiles_insert_own" ON public.profiles
-  FOR INSERT WITH CHECK (auth.uid() = id);
-CREATE POLICY "profiles_update_own" ON public.profiles
-  FOR UPDATE USING (auth.uid() = id);
-
--- 2. EVENTS
 CREATE TABLE IF NOT EXISTS public.events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
@@ -35,8 +30,52 @@ CREATE TABLE IF NOT EXISTS public.events (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
-ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
+CREATE TABLE IF NOT EXISTS public.friend_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sender_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  receiver_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'declined')),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(sender_id, receiver_id)
+);
 
+CREATE TABLE IF NOT EXISTS public.friendships (
+  user_id_1 UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  user_id_2 UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (user_id_1, user_id_2),
+  CHECK (user_id_1 < user_id_2)
+);
+
+CREATE TABLE IF NOT EXISTS public.event_attendees (
+  event_id UUID REFERENCES public.events(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  PRIMARY KEY (event_id, user_id)
+);
+
+-- ============================================================
+-- 2. ENABLE ROW LEVEL SECURITY ON ALL TABLES
+-- ============================================================
+
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.friend_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.friendships ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.event_attendees ENABLE ROW LEVEL SECURITY;
+
+-- ============================================================
+-- 3. CREATE ALL RLS POLICIES
+-- ============================================================
+
+-- 3a. PROFILES
+CREATE POLICY "profiles_read_all" ON public.profiles
+  FOR SELECT USING (true);
+CREATE POLICY "profiles_insert_own" ON public.profiles
+  FOR INSERT WITH CHECK (auth.uid() = id);
+CREATE POLICY "profiles_update_own" ON public.profiles
+  FOR UPDATE USING (auth.uid() = id);
+
+-- 3b. EVENTS (references friendships — must come after friendships table creation)
 CREATE POLICY "events_select_own_and_friends" ON public.events
   FOR SELECT USING (
     user_id = auth.uid()
@@ -53,18 +92,7 @@ CREATE POLICY "events_update_own" ON public.events
 CREATE POLICY "events_delete_own" ON public.events
   FOR DELETE USING (user_id = auth.uid());
 
--- 3. FRIEND REQUESTS
-CREATE TABLE IF NOT EXISTS public.friend_requests (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  sender_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
-  receiver_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
-  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'declined')),
-  created_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(sender_id, receiver_id)
-);
-
-ALTER TABLE public.friend_requests ENABLE ROW LEVEL SECURITY;
-
+-- 3c. FRIEND REQUESTS
 CREATE POLICY "friend_requests_insert" ON public.friend_requests
   FOR INSERT WITH CHECK (sender_id = auth.uid());
 CREATE POLICY "friend_requests_select" ON public.friend_requests
@@ -74,31 +102,13 @@ CREATE POLICY "friend_requests_update_receiver" ON public.friend_requests
 CREATE POLICY "friend_requests_delete_sender" ON public.friend_requests
   FOR DELETE USING (sender_id = auth.uid());
 
--- 4. FRIENDSHIPS
-CREATE TABLE IF NOT EXISTS public.friendships (
-  user_id_1 UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
-  user_id_2 UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  PRIMARY KEY (user_id_1, user_id_2),
-  CHECK (user_id_1 < user_id_2)
-);
-
-ALTER TABLE public.friendships ENABLE ROW LEVEL SECURITY;
-
+-- 3d. FRIENDSHIPS
 CREATE POLICY "friendships_select" ON public.friendships
   FOR SELECT USING (auth.uid() IN (user_id_1, user_id_2));
 CREATE POLICY "friendships_insert" ON public.friendships
   FOR INSERT WITH CHECK (auth.uid() IN (user_id_1, user_id_2));
 
--- 5. EVENT ATTENDEES
-CREATE TABLE IF NOT EXISTS public.event_attendees (
-  event_id UUID REFERENCES public.events(id) ON DELETE CASCADE NOT NULL,
-  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
-  PRIMARY KEY (event_id, user_id)
-);
-
-ALTER TABLE public.event_attendees ENABLE ROW LEVEL SECURITY;
-
+-- 3e. EVENT ATTENDEES (references friendships)
 CREATE POLICY "event_attendees_select" ON public.event_attendees
   FOR SELECT USING (
     user_id = auth.uid()
@@ -115,7 +125,10 @@ CREATE POLICY "event_attendees_insert" ON public.event_attendees
     OR auth.uid() IN (SELECT user_id FROM public.events WHERE id = event_id)
   );
 
--- Enable realtime for events table (so changes sync live)
+-- ============================================================
+-- 4. ENABLE REALTIME FOR LIVE SYNC
+-- ============================================================
+
 ALTER PUBLICATION supabase_realtime ADD TABLE public.events;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.friend_requests;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles;
