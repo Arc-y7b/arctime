@@ -19,10 +19,12 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 // ============================================================
 
 async function arctimeSignUp(email, password, displayName, username) {
+  const redirectUrl = window.location.origin + window.location.pathname;
   const { data, error } = await sb.auth.signUp({
     email,
     password,
     options: {
+      emailRedirectTo: redirectUrl,
       data: {
         display_name: displayName,
         username: username
