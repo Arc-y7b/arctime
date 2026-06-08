@@ -1449,6 +1449,9 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     errorEl.style.display = 'block';
     return;
   }
+  
+  // Successfully authenticated, load app data and transition UI
+  await loadAppData();
 });
 
 // Signup form
