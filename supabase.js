@@ -3,10 +3,10 @@
  * All browser-side queries use the anon key — RLS enforces permissions.
  */
 
-const SUPABASE_URL = 'https://bszdmkydzzujvctgihqk.supabase.co';
+const SUPABASE_URL = 'https://bszdmkydzzujvctgihqk.sb.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_Wyo_dz2gBAhc6Xg46R8qvg_UPRLIS73';
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
@@ -19,11 +19,11 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 // ============================================================
 
 async function arctimeSignUp(email, password, displayName, username) {
-  const { data, error } = await supabase.auth.signUp({ email, password });
+  const { data, error } = await sb.auth.signUp({ email, password });
   if (error) return { error };
 
   // Create profile row (RLS allows insert with auth.uid() = id)
-  const { error: profileError } = await supabase.from('profiles').insert({
+  const { error: profileError } = await sb.from('profiles').insert({
     id: data.user.id,
     display_name: displayName,
     username: username
@@ -34,24 +34,24 @@ async function arctimeSignUp(email, password, displayName, username) {
 }
 
 async function arctimeSignIn(email, password) {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
   if (error) return { error };
   return { data };
 }
 
 async function arctimeSignOut() {
-  const { error } = await supabase.auth.signOut();
+  const { error } = await sb.auth.signOut();
   return { error };
 }
 
 async function arctimeGetSession() {
-  const { data, error } = await supabase.auth.getSession();
+  const { data, error } = await sb.auth.getSession();
   if (error) return { session: null, error };
   return { session: data.session, error: null };
 }
 
 function arctimeOnAuth(callback) {
-  return supabase.auth.onAuthStateChange(callback);
+  return sb.auth.onAuthStateChange(callback);
 }
 
 // ============================================================
@@ -59,7 +59,7 @@ function arctimeOnAuth(callback) {
 // ============================================================
 
 async function arctimeGetProfile(userId) {
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from('profiles')
     .select('*')
     .eq('id', userId)
@@ -68,7 +68,7 @@ async function arctimeGetProfile(userId) {
 }
 
 async function arctimeUpdateProfile(userId, updates) {
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from('profiles')
     .update(updates)
     .eq('id', userId)
@@ -78,7 +78,7 @@ async function arctimeUpdateProfile(userId, updates) {
 }
 
 async function arctimeSearchUsers(query) {
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from('profiles')
     .select('id, username, display_name, avatar_url')
     .or(`username.ilike.%${query}%,display_name.ilike.%${query}%`)
@@ -87,7 +87,7 @@ async function arctimeSearchUsers(query) {
 }
 
 async function arctimeGetProfileByUsername(username) {
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from('profiles')
     .select('*')
     .eq('username', username)
@@ -100,7 +100,7 @@ async function arctimeGetProfileByUsername(username) {
 // ============================================================
 
 async function arctimeGetEvents(startDay, endDay) {
-  let query = supabase.from('events').select('*');
+  let query = sb.from('events').select('*');
   if (startDay !== undefined) query = query.gte('day_index', startDay);
   if (endDay !== undefined) query = query.lte('day_index', endDay);
   const { data, error } = await query.order('day_index').order('start_time');
@@ -108,7 +108,7 @@ async function arctimeGetEvents(startDay, endDay) {
 }
 
 async function arctimeCreateEvent(event) {
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from('events')
     .insert(event)
     .select()
@@ -117,7 +117,7 @@ async function arctimeCreateEvent(event) {
 }
 
 async function arctimeUpdateEvent(eventId, updates) {
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from('events')
     .update(updates)
     .eq('id', eventId)
@@ -127,7 +127,7 @@ async function arctimeUpdateEvent(eventId, updates) {
 }
 
 async function arctimeDeleteEvent(eventId) {
-  const { error } = await supabase
+  const { error } = await sb
     .from('events')
     .delete()
     .eq('id', eventId);
@@ -140,7 +140,7 @@ async function arctimeDeleteEvent(eventId) {
 
 async function arctimeAddAttendees(eventId, userIds) {
   const rows = userIds.map(uid => ({ event_id: eventId, user_id: uid }));
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from('event_attendees')
     .insert(rows)
     .select();
@@ -148,7 +148,7 @@ async function arctimeAddAttendees(eventId, userIds) {
 }
 
 async function arctimeGetAttendees(eventId) {
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from('event_attendees')
     .select('user_id')
     .eq('event_id', eventId);
@@ -160,7 +160,7 @@ async function arctimeGetAttendees(eventId) {
 // ============================================================
 
 async function arctimeSendFriendRequest(senderId, receiverId) {
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from('friend_requests')
     .insert({ sender_id: senderId, receiver_id: receiverId, status: 'pending' })
     .select()
@@ -169,7 +169,7 @@ async function arctimeSendFriendRequest(senderId, receiverId) {
 }
 
 async function arctimeGetFriendRequests(userId) {
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from('friend_requests')
     .select('*')
     .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
@@ -179,7 +179,7 @@ async function arctimeGetFriendRequests(userId) {
 
 async function arctimeAcceptFriendRequest(requestId) {
   // Get the request first to know sender/receiver
-  const { data: req, error: getError } = await supabase
+  const { data: req, error: getError } = await sb
     .from('friend_requests')
     .select('*')
     .eq('id', requestId)
@@ -187,7 +187,7 @@ async function arctimeAcceptFriendRequest(requestId) {
   if (getError) return { error: getError };
 
   // Update status to accepted
-  const { error: updateError } = await supabase
+  const { error: updateError } = await sb
     .from('friend_requests')
     .update({ status: 'accepted' })
     .eq('id', requestId);
@@ -196,7 +196,7 @@ async function arctimeAcceptFriendRequest(requestId) {
   // Create friendship row (user_id_1 < user_id_2)
   const id1 = req.sender_id < req.receiver_id ? req.sender_id : req.receiver_id;
   const id2 = req.sender_id < req.receiver_id ? req.receiver_id : req.sender_id;
-  const { error: friendError } = await supabase
+  const { error: friendError } = await sb
     .from('friendships')
     .insert({ user_id_1: id1, user_id_2: id2 });
   if (friendError) return { error: friendError };
@@ -205,7 +205,7 @@ async function arctimeAcceptFriendRequest(requestId) {
 }
 
 async function arctimeDeclineFriendRequest(requestId) {
-  const { error } = await supabase
+  const { error } = await sb
     .from('friend_requests')
     .update({ status: 'declined' })
     .eq('id', requestId);
@@ -213,7 +213,7 @@ async function arctimeDeclineFriendRequest(requestId) {
 }
 
 async function arctimeCancelFriendRequest(requestId) {
-  const { error } = await supabase
+  const { error } = await sb
     .from('friend_requests')
     .delete()
     .eq('id', requestId);
@@ -227,7 +227,7 @@ async function arctimeCancelFriendRequest(requestId) {
 async function arctimeRemoveFriend(userId, friendId) {
   const id1 = userId < friendId ? userId : friendId;
   const id2 = userId < friendId ? friendId : userId;
-  const { error } = await supabase
+  const { error } = await sb
     .from('friendships')
     .delete()
     .eq('user_id_1', id1)
@@ -236,7 +236,7 @@ async function arctimeRemoveFriend(userId, friendId) {
 }
 
 async function arctimeGetFriends(userId) {
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from('friendships')
     .select(`
       user_id_1, user_id_2,
@@ -259,7 +259,7 @@ async function arctimeGetFriends(userId) {
 // ============================================================
 
 function arctimeSubscribeEvents(channelName, callback) {
-  return supabase
+  return sb
     .channel(channelName)
     .on('postgres_changes',
       { event: '*', schema: 'public', table: 'events' },
@@ -269,7 +269,7 @@ function arctimeSubscribeEvents(channelName, callback) {
 }
 
 function arctimeSubscribeFriendRequests(userId, callback) {
-  return supabase
+  return sb
     .channel('friend-requests')
     .on('postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'friend_requests', filter: `receiver_id=eq.${userId}` },
@@ -279,5 +279,5 @@ function arctimeSubscribeFriendRequests(userId, callback) {
 }
 
 function arctimeUnsubscribe(channel) {
-  if (channel) supabase.removeChannel(channel);
+  if (channel) sb.removeChannel(channel);
 }

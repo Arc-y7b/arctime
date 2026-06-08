@@ -618,7 +618,7 @@ function renderCalendar() {
         if (state.copiedEvent) {
           const clickedTime12 = minutesToTwelveHourStr(roundedMin);
           
-          const onConfirm = () => {
+          const onConfirm = async () => {
             // Calculate duration of copied event
             const copiedStartMin = timeToMinutes(state.copiedEvent.startTime);
             let copiedEndMin = timeToMinutes(state.copiedEvent.endTime);
