@@ -19,17 +19,18 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 // ============================================================
 
 async function arctimeSignUp(email, password, displayName, username) {
-  const { data, error } = await sb.auth.signUp({ email, password });
+  const { data, error } = await sb.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        display_name: displayName,
+        username: username
+      }
+    }
+  });
   if (error) return { error };
 
-  // Create profile row (RLS allows insert with auth.uid() = id)
-  const { error: profileError } = await sb.from('profiles').insert({
-    id: data.user.id,
-    display_name: displayName,
-    username: username
-  });
-
-  if (profileError) return { error: profileError };
   return { data };
 }
 

@@ -132,3 +132,32 @@ CREATE POLICY "event_attendees_insert" ON public.event_attendees
 ALTER PUBLICATION supabase_realtime ADD TABLE public.events;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.friend_requests;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles;
+
+-- ============================================================
+-- 5. AUTOMATIC PROFILE CREATION TRIGGER ON SIGNUP
+-- ============================================================
+-- This trigger automatically creates a row in public.profiles
+-- when a new user signs up via auth.users. This runs under
+-- SECURITY DEFINER (bypass RLS) so it works even if email
+-- confirmation is enabled.
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.profiles (id, username, display_name, avatar_url)
+  VALUES (
+    new.id,
+    coalesce(new.raw_user_meta_data->>'username', 'user_' || substr(new.id::text, 1, 8)),
+    coalesce(new.raw_user_meta_data->>'display_name', 'New User'),
+    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80'
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger execution
+CREATE OR REPLACE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
