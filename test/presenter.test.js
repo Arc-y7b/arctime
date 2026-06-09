@@ -38,7 +38,7 @@ test('MobilePresenter switches views and adjusts DOM containers', () => {
   const suggestionsContainer = document.getElementById('suggestionsWrapper');
   const settingsContainer = document.getElementById('settingsWrapper');
 
-  assert.strictEqual(friendsContainer.style.display, 'block');
+  assert.strictEqual(friendsContainer.style.display, 'flex');
   assert.strictEqual(calendarContainer.style.display, 'none');
   assert.strictEqual(suggestionsContainer.style.display, 'none');
   assert.strictEqual(settingsContainer.style.display, 'none');

@@ -2947,11 +2947,10 @@ function setupMobileAdaptation() {
         toggleViewMode('friends-hub');
       } else if (tabName === 'settings') {
         openSettings();
-        mobilePresenter.switchTab(tabName);
-      } else {
-        // Use presenter switchTab directly for suggestions/settings
-        mobilePresenter.switchTab(tabName);
       }
+      
+      // Always run switchTab in the presenter to update containers correctly and hide inactive ones
+      mobilePresenter.switchTab(tabName);
     });
   });
   

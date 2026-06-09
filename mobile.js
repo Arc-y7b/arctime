@@ -114,7 +114,13 @@ export class MobilePresenter {
       const button = document.getElementById(buttonId);
       
       if (name === tabName) {
-        if (container) container.style.display = 'block';
+        if (container) {
+          if (name === 'calendar' || name === 'friends' || name === 'suggestions') {
+            container.style.display = 'flex';
+          } else {
+            container.style.display = 'block';
+          }
+        }
         if (button) button.classList.add('active');
       } else {
         if (container) container.style.display = 'none';
