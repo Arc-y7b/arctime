@@ -12,7 +12,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- Supabase JS SDK -->
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <link rel="stylesheet" href="style.css?v=1.5">
+  <link rel="stylesheet" href="style.css?v=1.6">
 </head>
 <body class="dark-mode">
   <div class="wallpaper-background-layer" id="wallpaperBgLayer"></div>
@@ -59,13 +59,13 @@
         </div>
         <div class="auth-field">
           <label for="signupDisplayName">Display Name</label>
-          <input type="text" id="signupDisplayName" placeholder="Aarav Patel" required class="auth-input">
+          <input type="text" id="signupDisplayName" placeholder="Display Name" required class="auth-input">
         </div>
         <div class="auth-field">
           <label for="signupUsername">Username</label>
           <div class="auth-username-wrap">
             <span class="auth-at-sign">@</span>
-            <input type="text" id="signupUsername" placeholder="aarav" required class="auth-input" style="padding-left: 28px;">
+            <input type="text" id="signupUsername" placeholder="Username" required class="auth-input" style="padding-left: 28px;">
           </div>
         </div>
         <div id="signupError" class="auth-error"></div>
@@ -97,7 +97,7 @@
           <span class="status-dot online"></span>
         </div>
         <div class="profile-info">
-          <span class="profile-name" id="userProfileName">Aarav Patel</span>
+          <span class="profile-name" id="userProfileName">Display Name</span>
           <span class="profile-tag">You (Host)</span>
         </div>
       </div>
@@ -663,7 +663,7 @@
       <!-- Username -->
       <div class="settings-group" style="display: flex; flex-direction: column; gap: 6px;">
         <label for="settingsUsername" style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted);">Display Name</label>
-        <input type="text" id="settingsUsername" value="Aarav Patel" class="form-input" placeholder="Your name">
+        <input type="text" id="settingsUsername" class="form-input" placeholder="Display Name">
       </div>
 
       <!-- Account Email -->
@@ -677,7 +677,7 @@
         <label for="settingsUserUsername" style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted);">Username Handle</label>
         <div style="position: relative;">
           <span style="position: absolute; left: 12px; top: 10px; color: var(--text-muted); font-size: 13px; font-weight: 600;">@</span>
-          <input type="text" id="settingsUserUsername" value="aarav" class="form-input" placeholder="username" style="padding-left: 26px; width: 100%;">
+          <input type="text" id="settingsUserUsername" class="form-input" placeholder="Username" style="padding-left: 26px; width: 100%;">
         </div>
         <div id="settingsUsernameWarning" style="display: none; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); color: #f87171; font-size: 11px; padding: 6px 10px; border-radius: 6px; align-items: center; gap: 6px; font-weight: 500; margin-top: 4px;">
           <i data-lucide="alert-circle" style="width: 14px; height: 14px; flex-shrink: 0;"></i>
@@ -768,7 +768,7 @@
     </button>
   </div>
 
-  <script src="supabase.js?v=1.5"></script>
-  <script type="module" src="app.js?v=1.5"></script>
+  <script src="supabase.js?v=1.6"></script>
+  <script type="module" src="app.js?v=1.6"></script>
 </body>
 </html>
