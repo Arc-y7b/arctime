@@ -2008,6 +2008,13 @@ function openSettings() {
 function closeSettings() {
   settingsDrawer.classList.remove('open');
   settingsDrawerBackdrop.classList.remove('open');
+  
+  if (document.body.classList.contains('is-mobile')) {
+    const calendarBtn = document.getElementById('mobileTabCalendar');
+    if (calendarBtn) {
+      calendarBtn.click();
+    }
+  }
 }
 
 openSettingsBtn.addEventListener('click', openSettings);
