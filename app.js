@@ -1,3 +1,5 @@
+import { ViewportBoundary, MobileCalendarState, SwipeGestureDetector, isPastDay, MobilePresenter } from './mobile.js';
+
 /**
  * ARCTIME CLIENT ENGINE
  * Handles mock database, calendar collision solver, interval-arithmetic scheduler,
@@ -444,7 +446,7 @@ const userProfileAvatar = document.getElementById('userProfileAvatar');
 const showCalendarBtn = document.getElementById('showCalendarBtn');
 const showFriendsHubBtn = document.getElementById('showFriendsHubBtn');
 const calendarWrapper = document.getElementById('calendarWrapper');
-const friendsHubWrapper = document.getElementById('friendsHubWrapper');
+const friendsHubWrapper = document.getElementById('friendsWrapper');
 const pendingRequestsBadge = document.getElementById('pendingRequestsBadge');
 const schedulerPanel = document.querySelector('.scheduler-panel');
 
@@ -593,6 +595,15 @@ function renderCalendarHeader() {
       <span class="day-header-name">${dayLabel}</span>
       <span class="day-header-number">${dateNum}</span>
     `;
+    
+    // Mobile active day click listener
+    dayHeader.addEventListener('click', () => {
+      if (document.body.classList.contains('is-mobile') && mobilePresenter) {
+        mobilePresenter.state.activeDayIndex = i;
+        updateMobileActiveDay();
+      }
+    });
+    
     calendarGridHeader.appendChild(dayHeader);
   }
   
@@ -601,6 +612,10 @@ function renderCalendarHeader() {
   const startMonth = months[state.currentWeekStart.getMonth()];
   const startYear = state.currentWeekStart.getFullYear();
   currentDateDisplay.textContent = `${startMonth} ${startYear}`;
+  
+  if (typeof updateMobileActiveDay === 'function') {
+    updateMobileActiveDay();
+  }
 }
 
 // Generate hour labels on the side
@@ -882,6 +897,10 @@ function renderCalendar() {
     }
 
     daysColumnsWrapper.appendChild(dayColumn);
+  }
+  
+  if (typeof updateMobileActiveDay === 'function') {
+    updateMobileActiveDay();
   }
   
   reloadIcons();
@@ -1720,6 +1739,10 @@ async function loadAppData() {
   renderNotificationsList();
   updateNotificationsBadge();
   updateClipboardBanner();
+  
+  if (typeof setupMobileAdaptation === 'function') {
+    setupMobileAdaptation();
+  }
   
   showToast(`Welcome, ${state.username}!`, 'success');
 }
@@ -2784,6 +2807,122 @@ if (pasteActionModal) {
     if (e.target === pasteActionModal) closePasteActionModal();
   });
 }
+
+// -------------------------------------------------------------
+// MOBILE PORTRAIT ADAPTATION INTEGRATION
+// -------------------------------------------------------------
+
+let mobilePresenter = null;
+
+function setupMobileAdaptation() {
+  mobilePresenter = new MobilePresenter();
+  
+  // Custom switchTab override for mobile settings to handle the drawer inner element transfer
+  const originalSwitchTab = mobilePresenter.switchTab;
+  mobilePresenter.switchTab = function(tabName) {
+    const settingsInner = document.getElementById('settingsDrawerInner');
+    const settingsWrapper = document.getElementById('settingsWrapper');
+    const settingsDrawer = document.getElementById('settingsDrawer');
+    
+    if (tabName === 'settings') {
+      if (settingsInner && settingsWrapper) {
+        settingsWrapper.appendChild(settingsInner);
+      }
+    } else {
+      // Put it back to drawer
+      if (settingsInner && settingsDrawer) {
+        settingsDrawer.appendChild(settingsInner);
+      }
+    }
+    
+    // Call the original method
+    originalSwitchTab.call(this, tabName);
+  };
+  
+  // Handle resize events
+  window.addEventListener('resize', () => {
+    mobilePresenter.handleResize();
+    updateMobileActiveDay();
+  });
+  
+  // Initial run
+  mobilePresenter.handleResize();
+  
+  // Bind click listeners on mobile tab buttons
+  document.querySelectorAll('.mobile-nav-bar .mobile-nav-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const tabName = btn.dataset.tab;
+      
+      // Update UI classes on bottom buttons
+      document.querySelectorAll('.mobile-nav-bar .mobile-nav-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      
+      // Toggle views
+      if (tabName === 'calendar') {
+        toggleViewMode('calendar');
+      } else if (tabName === 'friends') {
+        toggleViewMode('friends-hub');
+      } else {
+        // Use presenter switchTab directly for suggestions/settings
+        mobilePresenter.switchTab(tabName);
+      }
+    });
+  });
+  
+  // Bind swipe gestures on calendar day columns wrapper
+  const swipeDetector = new SwipeGestureDetector();
+  const swipeTarget = document.getElementById('daysColumnsWrapper');
+  if (swipeTarget) {
+    swipeTarget.addEventListener('touchstart', (e) => {
+      if (!document.body.classList.contains('is-mobile')) return;
+      const touch = e.touches[0];
+      swipeDetector.start(touch.clientX, touch.clientY);
+    }, { passive: true });
+    
+    swipeTarget.addEventListener('touchend', (e) => {
+      if (!document.body.classList.contains('is-mobile')) return;
+      const touch = e.changedTouches[0];
+      const action = swipeDetector.end(touch.clientX, touch.clientY);
+      
+      if (action === 'next') {
+        mobilePresenter.state.changeActiveDay(1);
+        updateMobileActiveDay();
+      } else if (action === 'prev') {
+        mobilePresenter.state.changeActiveDay(-1);
+        updateMobileActiveDay();
+      }
+    }, { passive: true });
+  }
+}
+
+function updateMobileActiveDay() {
+  if (!mobilePresenter || !document.body.classList.contains('is-mobile')) return;
+  
+  const activeIndex = mobilePresenter.state.activeDayIndex;
+  
+  // Toggle columns classes
+  const columns = document.querySelectorAll('.day-column');
+  columns.forEach((col, idx) => {
+    if (idx === activeIndex) {
+      col.classList.add('active-mobile-day');
+    } else {
+      col.classList.remove('active-mobile-day');
+    }
+  });
+  
+  // Toggle day header active indicator classes
+  const headers = document.querySelectorAll('.day-header');
+  headers.forEach((hdr, idx) => {
+    if (idx === activeIndex) {
+      hdr.classList.add('active-mobile-header');
+    } else {
+      hdr.classList.remove('active-mobile-header');
+    }
+  });
+}
+
+// Make globally accessible
+window.updateMobileActiveDay = updateMobileActiveDay;
 
 // Start Application
 init();

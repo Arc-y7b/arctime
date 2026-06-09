@@ -1819,3 +1819,235 @@ body {
 .user-menu-btn:hover {
   background: rgba(239, 68, 68, 0.2);
 }
+
+/* ============================================================
+   MOBILE RESPONSIVE STYLES (PORTRAIT VIEWPORTS)
+   ============================================================ */
+@media (max-width: 767px) {
+  /* Enforce single column viewport layout */
+  .is-mobile .app-container {
+    grid-template-columns: 1fr !important;
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Hide left desktop sidebar */
+  .is-mobile .sidebar {
+    display: none !important;
+  }
+
+  /* Adjust main content panel to fill viewport */
+  .is-mobile .main-content {
+    height: calc(100vh - 68px) !important;
+    padding-bottom: 0 !important;
+  }
+
+  /* Hide desktop-only layout controls */
+  .is-mobile .view-toggles,
+  .is-mobile .app-mode-toggles,
+  .is-mobile .sync-overlay-btn,
+  .is-mobile .timezone-selector {
+    display: none !important;
+  }
+
+  .is-mobile .navbar {
+    padding: 12px 16px !important;
+    height: 60px !important;
+  }
+
+  .is-mobile .current-date {
+    font-size: 18px !important;
+  }
+
+  /* Calendar Grid adaptations */
+  .is-mobile .calendar-wrapper {
+    height: calc(100% - 130px) !important; /* Subtract header + active day slider heights */
+  }
+
+  .is-mobile .calendar-grid-header {
+    display: flex !important;
+    gap: 6px;
+    padding: 6px 12px;
+    background: rgba(13, 17, 28, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .is-mobile .time-col-header {
+    display: none !important;
+  }
+
+  .is-mobile .day-header {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 4px;
+    border-radius: 12px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+  }
+
+  .is-mobile .day-header.active-mobile-header {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.15));
+    border-color: rgba(59, 130, 246, 0.25);
+  }
+
+  .is-mobile .day-header.active-mobile-header .day-header-number {
+    background: var(--accent-primary);
+    color: white;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+  }
+
+  .is-mobile .day-header-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    margin-top: 4px;
+    font-weight: 700;
+    font-size: 13px;
+    transition: all 0.2s ease;
+  }
+
+  .is-mobile .day-header-name {
+    font-size: 10px;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
+  /* Hide inactive day columns - only show the active day index */
+  .is-mobile .day-column {
+    display: none !important;
+  }
+
+  .is-mobile .day-column.active-mobile-day {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  /* Friends hub responsiveness */
+  .is-mobile .friends-hub-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+    padding-bottom: 24px;
+  }
+
+  /* Move suggestions panel from side column to overlay layer */
+  .is-mobile #suggestionsWrapper {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 90;
+    background: var(--bg-app);
+    padding: 20px;
+    overflow-y: auto;
+    border-left: none !important;
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  .is-mobile .suggestions-list {
+    max-height: none !important;
+  }
+
+  /* Align modals at the bottom as Bottom Sheets */
+  .is-mobile .modal-backdrop {
+    align-items: flex-end;
+    justify-content: center;
+  }
+
+  .is-mobile .modal-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 24px 24px 0 0 !important;
+    margin: 0 !important;
+    transform: translateY(100%) !important;
+    max-height: 85vh !important;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: env(safe-area-inset-bottom, 24px) !important;
+  }
+
+  .is-mobile .modal-backdrop.open .modal-card {
+    transform: translateY(0) scale(1) !important;
+  }
+
+  /* Transform sliding settings drawer to bottom sheet */
+  .is-mobile .settings-drawer {
+    width: 100% !important;
+    height: 85vh !important;
+    top: auto !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    border-radius: 24px 24px 0 0 !important;
+    transform: translateY(100%) !important;
+    z-index: 1010;
+  }
+
+  .is-mobile .settings-drawer.open {
+    transform: translateY(0) !important;
+  }
+
+  /* Bottom Tab Navigation Bar styles */
+  .mobile-nav-bar {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 68px;
+    background: rgba(13, 17, 28, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    justify-content: space-around;
+    align-items: center;
+    z-index: 1000;
+    padding-bottom: env(safe-area-inset-bottom, 10px);
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.4);
+  }
+
+  .mobile-nav-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 8px 12px;
+    transition: all 0.2s ease;
+    position: relative;
+    flex: 1;
+  }
+
+  .mobile-nav-btn i {
+    width: 20px;
+    height: 20px;
+    transition: transform 0.2s ease;
+  }
+
+  .mobile-nav-btn.active {
+    color: var(--accent-primary);
+  }
+
+  .mobile-nav-btn.active i {
+    transform: translateY(-2px) scale(1.1);
+    color: var(--accent-primary);
+  }
+}

@@ -234,7 +234,7 @@
       </div>
 
       <!-- Friends Hub Container -->
-      <div class="friends-hub-wrapper" id="friendsHubWrapper" style="display: none; flex-grow: 1; padding: 24px; overflow-y: auto;">
+      <div class="friends-hub-wrapper" id="friendsWrapper" style="display: none; flex-grow: 1; padding: 24px; overflow-y: auto;">
         <div class="friends-hub-grid" style="display: grid; grid-template-columns: 1fr 340px; gap: 24px; height: 100%; align-items: start;">
           
           <!-- Left Area: Add Friend & Pending Requests -->
@@ -343,10 +343,12 @@
 
         </div>
       </div>
+      <!-- Settings Tab Container for Mobile -->
+      <div class="settings-wrapper" id="settingsWrapper" style="display: none; padding: 24px; overflow-y: auto; flex-grow: 1;"></div>
     </main>
 
     <!-- Right Scheduler Panel -->
-    <aside class="scheduler-panel">
+    <aside class="scheduler-panel" id="suggestionsWrapper">
       <div class="panel-section">
         <h2 class="panel-heading">
           <i data-lucide="wand2"></i>
@@ -640,7 +642,8 @@
   <!-- Settings Drawer slide-out -->
   <div class="settings-drawer-backdrop" id="settingsDrawerBackdrop"></div>
   <div class="settings-drawer" id="settingsDrawer">
-    <div class="drawer-header" style="padding: 20px 24px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+    <div class="settings-drawer-inner" id="settingsDrawerInner" style="display: flex; flex-direction: column; height: 100%; overflow-y: auto;">
+      <div class="drawer-header" style="padding: 20px 24px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
       <h3 style="font-family: var(--font-title); font-size: 18px; font-weight: 700; color: var(--text-primary); margin: 0;">App Settings</h3>
       <button class="close-drawer-btn" id="closeSettingsBtn" style="background: none; border: none; color: var(--text-secondary); font-size: 24px; cursor: pointer; transition: color 0.2s;">&times;</button>
     </div>
@@ -716,6 +719,7 @@
         <button class="btn btn-primary" id="saveSettingsBtn" style="flex-grow: 1;">Save Changes</button>
       </div>
     </div>
+    </div>
   </div>
 
   <!-- Toast Notification Container -->
@@ -729,6 +733,27 @@
     </div>
     <button class="clipboard-clear-btn" id="clearClipboardBtn" title="Clear Clipboard">
       <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+    </button>
+  </div>
+
+  <!-- Mobile Bottom Tab Navigation -->
+  <div class="mobile-nav-bar" id="mobileNavBar">
+    <button class="mobile-nav-btn active" id="mobileTabCalendar" data-tab="calendar">
+      <i data-lucide="calendar"></i>
+      <span>Calendar</span>
+    </button>
+    <button class="mobile-nav-btn" id="mobileTabFriends" data-tab="friends">
+      <i data-lucide="users"></i>
+      <span>Friends</span>
+      <span class="badge" id="mobileFriendsBadge" style="display: none;"></span>
+    </button>
+    <button class="mobile-nav-btn" id="mobileTabSuggestions" data-tab="suggestions">
+      <i data-lucide="sparkles"></i>
+      <span>Suggestions</span>
+    </button>
+    <button class="mobile-nav-btn" id="mobileTabSettings" data-tab="settings">
+      <i data-lucide="settings"></i>
+      <span>Settings</span>
     </button>
   </div>
 
