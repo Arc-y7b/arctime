@@ -1299,27 +1299,25 @@ bookingForm.addEventListener('submit', async (e) => {
     return;
   }
   
-  // Prevent booking new events in the past
-  if (!state.editingEventId) {
-    const today = new Date();
-    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const [startHour, startMin] = startTimeStr.split(':').map(Number);
-    
-    const dateOfColumn = getDateOfIndex(displayDayIndex);
-    const columnStart = new Date(dateOfColumn.getFullYear(), dateOfColumn.getMonth(), dateOfColumn.getDate());
-    
-    if (columnStart < todayStart) {
+  // Prevent booking events in the past
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const [startHour, startMin] = startTimeStr.split(':').map(Number);
+  
+  const dateOfColumn = getDateOfIndex(displayDayIndex);
+  const columnStart = new Date(dateOfColumn.getFullYear(), dateOfColumn.getMonth(), dateOfColumn.getDate());
+  
+  if (columnStart < todayStart) {
+    showToast('Cannot book slots in the past!', 'info');
+    return;
+  }
+  
+  if (columnStart.getTime() === todayStart.getTime()) {
+    const currentMin = today.getHours() * 60 + today.getMinutes();
+    const bookingMin = startHour * 60 + startMin;
+    if (bookingMin < currentMin) {
       showToast('Cannot book slots in the past!', 'info');
       return;
-    }
-    
-    if (columnStart.getTime() === todayStart.getTime()) {
-      const currentMin = today.getHours() * 60 + today.getMinutes();
-      const bookingMin = startHour * 60 + startMin;
-      if (bookingMin < currentMin) {
-        showToast('Cannot book slots in the past!', 'info');
-        return;
-      }
     }
   }
   
@@ -1511,7 +1509,7 @@ todayBtn.addEventListener('click', () => {
 });
 
 // -------------------------------------------------------------
-// AUTH UI CONTROLS
+// 9. AUTH UI CONTROLS
 // -------------------------------------------------------------
 
 const authOverlay = document.getElementById('authOverlay');
