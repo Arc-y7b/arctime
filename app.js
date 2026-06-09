@@ -1998,8 +1998,10 @@ function openSettings() {
   
   settingsUsernameWarning.style.display = 'none';
   
-  settingsDrawer.classList.add('open');
-  settingsDrawerBackdrop.classList.add('open');
+  if (!document.body.classList.contains('is-mobile')) {
+    settingsDrawer.classList.add('open');
+    settingsDrawerBackdrop.classList.add('open');
+  }
 }
 
 // Close Settings Drawer
@@ -2936,6 +2938,9 @@ function setupMobileAdaptation() {
         toggleViewMode('calendar');
       } else if (tabName === 'friends') {
         toggleViewMode('friends-hub');
+      } else if (tabName === 'settings') {
+        openSettings();
+        mobilePresenter.switchTab(tabName);
       } else {
         // Use presenter switchTab directly for suggestions/settings
         mobilePresenter.switchTab(tabName);
