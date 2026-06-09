@@ -12,23 +12,23 @@ Originally built as a pure client-side application using local storage, ArcTime 
 
 ArcTime runs on a lightweight, high-performance tech stack:
 
-* **Frontend**: Vanilla HTML5, CSS3 (CSS Grid, Custom variables, Glassmorphism, animations), and modular JavaScript.
+* **Frontend**: Vanilla HTML5, CSS3 (CSS Grid, Custom variables, Glassmorphism, animations), and modular JavaScript (ES Modules).
 * **Database & Auth**: Supabase (PostgreSQL, GoTrue, PostgREST).
 * **Realtime**: Supabase Realtime Channels (PostgreSQL changes listener) for instant scheduling updates.
 * **Icons**: Lucide Icons CDN.
 
 ```
-┌────────────────────────────────────────────────────────┐
-│                      index.html                        │
-│     (Weekly Calendar Grid, Modals, Auth Forms, UI)     │
-├──────────────────────────┬─────────────────────────────┤
-│        style.css         │         supabase.js         │
-│   (Glassmorphic styles,  │   (Supabase SDK Client,     │
-│    variables, theme)     │    auth API & data helpers) │
-├──────────────────────────┴─────────────────────────────┤
-│                         app.js                         │
-│   (UI rendering, Timezone engine, Scheduler, Event handlers) │
-└────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                           index.html                             │
+│         (Weekly Calendar Grid, Modals, Auth Forms, UI)           │
+├───────────────────────┬──────────────────────┬───────────────────┤
+│       style.css       │     supabase.js      │     mobile.js     │
+│  (Glassmorphic styles,│ (Supabase SDK Client,│(Viewport Boundary,│
+│   variables, theme)   │  auth API & data)    │ mobile presenters)│
+├───────────────────────┴──────────────────────┴───────────────────┤
+│                             app.js                               │
+│     (UI rendering, Timezone engine, Scheduler, Event handlers)    │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -74,6 +74,14 @@ ArcTime uses PostgreSQL database tables with strict Row-Level Security (RLS) pol
 * Copy & Paste events across days with a floating bottom clipboard banner.
 * Edit existing event details or delete them through custom UI modals.
 
+### 5. Mobile Portrait Optimization (< 768px)
+* **Single-Day Timeline Carousel**: Displays one active day at a time in portrait viewports to optimize space.
+* **Swipe Gesture Navigation**: Smooth horizontal swipe gestures on the calendar columns switch the selected day forward/backward.
+* **Responsive Bottom Tab Bar**: Replaces desktop sidebars/headers with active view switching: **Calendar**, **Friends**, **Suggestions**, and **Settings**.
+* **Transitioning Bottom Sheets**: Desktop settings drawers and booking modals transform into touch-friendly slide-up bottom sheets.
+* **Auto-Saving Settings**: Saving or canceling settings automatically redirects the user back to the Calendar view.
+* **Cache-Busting Integration**: Complete version-query parameters (`?v=2.0`) protect users from old local caching.
+
 ---
 
 ## Setup & Local Development
@@ -107,6 +115,14 @@ npx serve .
 ```
 
 Open `http://localhost:8000` in your web browser.
+
+### 3. Running Unit Tests
+ArcTime features unit testing for its mobile presentation layers and gesture modules using Node's native test runner:
+
+```bash
+# Run all mobile presenter and gesture spec tests
+node test/mobile.test.js && node test/presenter.test.js
+```
 
 ---
 
