@@ -1222,6 +1222,9 @@ function openBookingModal(dayIndex, startTimeStr = '12:00', endTimeStr = '13:00'
       typeRadio.checked = true;
       typeRadio.dispatchEvent(new Event('change'));
     }
+    
+    const repeatGroup = document.getElementById('repeatAllWeekGroup');
+    if (repeatGroup) repeatGroup.style.display = 'none';
   } else {
     if (modalTitleEl) modalTitleEl.textContent = 'Book Group Activity';
     if (submitBtnEl) submitBtnEl.textContent = 'Create Shared Event';
@@ -1236,6 +1239,11 @@ function openBookingModal(dayIndex, startTimeStr = '12:00', endTimeStr = '13:00'
       personalRadio.checked = true;
       personalRadio.dispatchEvent(new Event('change'));
     }
+    
+    const repeatGroup = document.getElementById('repeatAllWeekGroup');
+    if (repeatGroup) repeatGroup.style.display = 'block';
+    const repeatCheckbox = document.getElementById('repeatAllWeek');
+    if (repeatCheckbox) repeatCheckbox.checked = false;
   }
   
   const targetDate = getDateOfIndex(targetDayIndex);
@@ -1318,25 +1326,30 @@ bookingForm.addEventListener('submit', async (e) => {
     return;
   }
   
-  // Prevent booking events in the past
+  // Prevent booking events in the past (unless repeating for the whole week)
   const today = new Date();
   const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const [startHour, startMin] = startTimeStr.split(':').map(Number);
   
+  const repeatCheckbox = document.getElementById('repeatAllWeek');
+  const repeatAllWeek = repeatCheckbox ? repeatCheckbox.checked : false;
+  
   const dateOfColumn = getDateOfIndex(displayDayIndex);
   const columnStart = new Date(dateOfColumn.getFullYear(), dateOfColumn.getMonth(), dateOfColumn.getDate());
   
-  if (columnStart < todayStart) {
-    showToast('Cannot book slots in the past!', 'info');
-    return;
-  }
-  
-  if (columnStart.getTime() === todayStart.getTime()) {
-    const currentMin = today.getHours() * 60 + today.getMinutes();
-    const bookingMin = startHour * 60 + startMin;
-    if (bookingMin < currentMin) {
+  if (!repeatAllWeek) {
+    if (columnStart < todayStart) {
       showToast('Cannot book slots in the past!', 'info');
       return;
+    }
+    
+    if (columnStart.getTime() === todayStart.getTime()) {
+      const currentMin = today.getHours() * 60 + today.getMinutes();
+      const bookingMin = startHour * 60 + startMin;
+      if (bookingMin < currentMin) {
+        showToast('Cannot book slots in the past!', 'info');
+        return;
+      }
     }
   }
   
@@ -1387,35 +1400,90 @@ bookingForm.addEventListener('submit', async (e) => {
     return;
   }
   
-  // CREATE new event
-  const { data: newEvent, error: createError } = await arctimeCreateEvent({
-    user_id: state.userId,
-    title,
-    day_index: gmtDayIndex,
-    start_time: gmtStartTime,
-    end_time: gmtEndTime,
-    event_type: eventType,
-    category,
-    notes
-  });
-  
-  if (createError) {
-    showToast('Failed to create event: ' + createError.message, 'info');
-    return;
-  }
-  
-  // Add attendees for group events
-  if (eventType === 'group' && invitees.length > 0) {
-    await arctimeAddAttendees(newEvent.id, invitees);
+  // CREATE new event(s)
+  if (repeatAllWeek) {
+    const promises = [];
+    for (let d = 0; d < 7; d++) {
+      const gmtT = displayToGmt(d, startTimeStr);
+      const gmtD = gmtT.dayIndex;
+      const gmtS = gmtT.timeStr;
+      
+      const startMinG = timeToMinutes(gmtS);
+      const endMinG = startMinG + duration;
+      const gmtE = minutesToTimeStr(endMinG);
+      
+      if (endMinG > 1440) {
+        continue;
+      }
+      
+      promises.push(arctimeCreateEvent({
+        user_id: state.userId,
+        title,
+        day_index: gmtD,
+        start_time: gmtS,
+        end_time: gmtE,
+        event_type: eventType,
+        category,
+        notes
+      }));
+    }
+    
+    const results = await Promise.all(promises);
+    
+    // Check if any errors occurred
+    const errors = results.filter(r => r.error);
+    if (errors.length > 0) {
+      showToast('Failed to create some recurring events: ' + errors[0].error.message, 'info');
+    }
+    
+    // Add attendees for group events
+    if (eventType === 'group' && invitees.length > 0) {
+      const attendeePromises = [];
+      results.forEach(res => {
+        if (res.data && res.data.id) {
+          attendeePromises.push(arctimeAddAttendees(res.data.id, invitees));
+        }
+      });
+      await Promise.all(attendeePromises);
+    }
+  } else {
+    const { data: newEvent, error: createError } = await arctimeCreateEvent({
+      user_id: state.userId,
+      title,
+      day_index: gmtDayIndex,
+      start_time: gmtStartTime,
+      end_time: gmtEndTime,
+      event_type: eventType,
+      category,
+      notes
+    });
+    
+    if (createError) {
+      showToast('Failed to create event: ' + createError.message, 'info');
+      return;
+    }
+    
+    // Add attendees for group events
+    if (eventType === 'group' && invitees.length > 0) {
+      await arctimeAddAttendees(newEvent.id, invitees);
+    }
   }
   
   await saveEventsToStorage();
   closeBookingModal();
   
   if (eventType === 'personal') {
-    addNotification('Calendar Blocked', `Blocked personal busy time: "${title}"`, 'warning');
+    if (repeatAllWeek) {
+      addNotification('Calendar Blocked', `Blocked personal busy times for the week: "${title}"`, 'warning');
+    } else {
+      addNotification('Calendar Blocked', `Blocked personal busy time: "${title}"`, 'warning');
+    }
   } else {
-    addNotification('Group Plan Booked', `Successfully booked "${title}" together!`, 'success');
+    if (repeatAllWeek) {
+      addNotification('Group Plans Booked', `Successfully booked weekly "${title}" plans!`, 'success');
+    } else {
+      addNotification('Group Plan Booked', `Successfully booked "${title}" together!`, 'success');
+    }
   }
   
   renderCalendar();
