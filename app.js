@@ -1690,8 +1690,10 @@ async function loadAppData() {
   
   if (profileError) {
     console.error('Failed to load profile from Supabase:', profileError);
-    if (profileError.message === 'Failed to fetch' || profileError.status === 0) {
-      showToast('Database connection blocked! Please check your network or disable Brave Shields/ad-blockers.', 'info');
+    if (profileError.message === 'Failed to fetch' || profileError.status === 0 || profileError.status === '0') {
+      showToast('Database connection blocked! Please disable Brave Shields/ad-blockers.', 'info');
+    } else {
+      showToast('Profile load error: ' + profileError.message, 'info');
     }
   }
   
@@ -1726,6 +1728,7 @@ async function loadAppData() {
   const eventsResult = await arctimeGetEvents(0, 6);
   if (eventsResult.error) {
     console.error('Failed to load events from Supabase:', eventsResult.error);
+    showToast('Events load error: ' + eventsResult.error.message, 'info');
   }
   const events = eventsResult.data;
   state.events = events ? events.map(mapDbEventToAppEvent) : [];
@@ -1734,6 +1737,7 @@ async function loadAppData() {
   const friendsResult = await arctimeGetFriends(session.user.id);
   if (friendsResult.error) {
     console.error('Failed to load friendships from Supabase:', friendsResult.error);
+    showToast('Friends load error: ' + friendsResult.error.message, 'info');
   }
   const friends = friendsResult.data;
   state.friendsData = friends || [];
