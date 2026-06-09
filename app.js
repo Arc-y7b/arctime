@@ -1609,11 +1609,23 @@ function addSignOutButton() {
   btn.id = 'signOutBtn';
   btn.className = 'user-menu-btn';
   btn.innerHTML = '<i data-lucide="log-out" style="width: 14px; height: 14px;"></i> Sign Out';
-  btn.addEventListener('click', async () => {
+  
+  const handleLogout = async () => {
     await arctimeSignOut();
     window.location.reload();
-  });
+  };
+  
+  btn.addEventListener('click', handleLogout);
   profileCard.parentNode.insertBefore(btn, profileCard.nextSibling);
+  
+  const drawerSignOut = document.getElementById('drawerSignOutBtn');
+  if (drawerSignOut) {
+    // Remove old listeners by cloning or just clear and re-add
+    const newDrawerSignOut = drawerSignOut.cloneNode(true);
+    drawerSignOut.parentNode.replaceChild(newDrawerSignOut, drawerSignOut);
+    newDrawerSignOut.addEventListener('click', handleLogout);
+  }
+  
   reloadIcons();
 }
 
