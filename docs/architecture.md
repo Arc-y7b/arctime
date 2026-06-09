@@ -45,20 +45,22 @@ ArcTime is migrating from a purely client-side app (localStorage) to a **Supabas
 ┌──────────────────────────────────────────────────────────┐
 │                    Browser (GitHub Pages)                 │
 │                                                          │
-│  index.html  ───  style.css  ───  app.js                │
-│                                         │                │
-│                                   supabase.js            │
-│                              (client initialisation)      │
-│                                         │                │
-└─────────────────────────────────────────┼────────────────┘
-                                          │
-                    ┌─────────────────────┼─────────────────────┐
-                    │                     │                     │
-               ┌────┴─────┐        ┌──────┴──────┐        ┌────┴─────┐
-               │  Supabase │        │  Supabase   │        │ Supabase  │
-               │   Auth    │        │  Database   │        │ Realtime  │
-               │ (GoTrue)  │        │ (PostgreSQL)│        │(WebSocket)│
-               └──────────┘        └──────┬───────┘        └──────────┘
+│  index.html  ───  style.css  ───  app.js                 │
+│                                   │    │                 │
+│                         ┌─────────┘    └────────┐        │
+│                         ▼                       ▼        │
+│                    supabase.js               mobile.js   │
+│             (client initialisation)     (viewport state) │
+│                         │                                │
+└─────────────────────────┼────────────────────────────────┘
+                          │
+                    ┌─────┴───────────────┬──────────────┐
+                    │                     │              │
+               ┌────┴─────┐        ┌──────┴──────┐  ┌────┴─────┐
+               │  Supabase │        │  Supabase   │  │ Supabase  │
+               │   Auth    │        │  Database   │  │ Realtime  │
+               │ (GoTrue)  │        │ (PostgreSQL)│  │(WebSocket)│
+               └──────────┘        └──────┬───────┘  └──────────┘
                                           │
                     ┌─────────────────────┼─────────────────────┐
                     │                     │                     │
@@ -371,7 +373,7 @@ For better UX, the app applies changes locally first (optimistic), then confirms
 ### 9.1 Module Structure
 
 ```
-app.js (main application logic — 2,500+ lines)
+app.js (main application logic — 3,000+ lines)
 ├── State Management (Supabase-aware)
 ├── Rendering Engine
 │   ├── renderCalendar()
@@ -381,13 +383,20 @@ app.js (main application logic — 2,500+ lines)
 │   └── renderSharedEventsWidget()
 ├── Modal Controllers
 ├── Event Handlers
+├── Mobile Adaptation Integration (setupMobileAdaptation)
 └── Initialisation
 
-supabase.js (new)
+supabase.js
 ├── Client initialisation (anon key)
 ├── Auth helpers (login, signup, logout, session)
 ├── Data helpers (events CRUD, friend requests, friendships)
 └── Realtime subscription setup
+
+mobile.js (mobile viewport state & UI presenter)
+├── ViewportBoundary (value object for size/orientation)
+├── MobileCalendarState (aggregate root for active tab & carousel day)
+├── SwipeGestureDetector (touch swipe offset calculator)
+└── MobilePresenter (manages mobile CSS toggles and DOM tab contents)
 ```
 
 ### 9.2 State Migration (localStorage → Supabase)
@@ -505,3 +514,16 @@ Hidden once all initial queries resolve.
 - **Rate limiting**: Supabase has built-in rate limiting on the API Gateway
 - **Presence**: Supabase Realtime supports presence channels for "who's online"
 - **Storage API**: For avatar uploads instead of data URLs (Supabase Storage has a free tier)
+
+---
+
+## 14. Mobile Portrait Adaptation (< 768px)
+
+In June 2026, ArcTime was updated to support premium, touch-first mobile portrait viewports. This adaptation was designed around Bounded Context boundaries to isolate presentation-specific rules from core scheduling engines.
+
+### 14.1 Architecture Decisions
+- **Decoupled Presenter Model**: [mobile.js](file:///home/aarav/Projects/arctime/mobile.js) contains the state machines (`MobileCalendarState`, `MobilePresenter`) handling gesture inputs and tab structures, keeping [app.js](file:///home/aarav/Projects/arctime/app.js) focused on core database sync logic.
+- **Single-Day Carousel Display**: The 7-day grid transforms to a single-day column viewport on mobile. Days are transitioned using horizontal swipes calculated by `SwipeGestureDetector` or by tapping the horizontal week slider.
+- **Tab Layout Content Relocation**: Tabs on mobile mount/unmount DOM sub-trees to prevent duplicates. When switching to settings, the app dynamically appends the settings drawer inner container into the mobile tab layout, returning it to the hidden desktop drawer when leaving settings.
+- **Aggressive Cache-Busting**: All assets and sub-modules are loaded using version queries (`?v=2.0`) to bypass caching policies of mobile Safari and Chrome browsers.
+- **Test-Driven Domain Spec**: All viewport boundaries and presenter actions are validated against unit test specs inside [test/mobile.test.js](file:///home/aarav/Projects/arctime/test/mobile.test.js) and [test/presenter.test.js](file:///home/aarav/Projects/arctime/test/presenter.test.js).
