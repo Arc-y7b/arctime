@@ -2897,6 +2897,17 @@ if (pasteActionModal) {
 
 let mobilePresenter = null;
 
+function updateMobileFabVisibility() {
+  const mobileFabBtn = document.getElementById('mobileFabBtn');
+  if (!mobileFabBtn) return;
+  
+  if (document.body.classList.contains('is-mobile') && mobilePresenter && mobilePresenter.state.activeTab === 'calendar') {
+    mobileFabBtn.style.display = 'flex';
+  } else {
+    mobileFabBtn.style.display = 'none';
+  }
+}
+
 function setupMobileAdaptation() {
   mobilePresenter = new MobilePresenter();
   
@@ -2920,16 +2931,35 @@ function setupMobileAdaptation() {
     
     // Call the original method
     originalSwitchTab.call(this, tabName);
+    updateMobileFabVisibility();
   };
   
   // Handle resize events
   window.addEventListener('resize', () => {
     mobilePresenter.handleResize();
     updateMobileActiveDay();
+    updateMobileFabVisibility();
   });
   
   // Initial run
   mobilePresenter.handleResize();
+  updateMobileFabVisibility();
+  
+  // Bind click listener for mobile Floating Action Button
+  const mobileFabBtn = document.getElementById('mobileFabBtn');
+  if (mobileFabBtn) {
+    mobileFabBtn.addEventListener('click', () => {
+      const today = new Date();
+      // Use the active day index from mobile state
+      const dayOfWeek = mobilePresenter.state.activeDayIndex;
+      
+      const currentHour = today.getHours();
+      const startTimeStr = `${currentHour.toString().padStart(2, '0')}:00`;
+      const endTimeStr = `${((currentHour + 1) % 24).toString().padStart(2, '0')}:00`;
+      
+      openBookingModal(dayOfWeek, startTimeStr, endTimeStr);
+    });
+  }
   
   // Bind click listeners on mobile tab buttons
   document.querySelectorAll('.mobile-nav-bar .mobile-nav-btn').forEach(btn => {
