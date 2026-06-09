@@ -1684,9 +1684,18 @@ async function loadAppData() {
   state.userId = session.user.id;
   
   // Load profile
-  let { data: profile } = await arctimeGetProfile(session.user.id);
+  const profileResult = await arctimeGetProfile(session.user.id);
+  let profile = profileResult.data;
+  const profileError = profileResult.error;
   
-  if (!profile) {
+  if (profileError) {
+    console.error('Failed to load profile from Supabase:', profileError);
+    if (profileError.message === 'Failed to fetch' || profileError.status === 0) {
+      showToast('Database connection blocked! Please check your network or disable Brave Shields/ad-blockers.', 'info');
+    }
+  }
+  
+  if (!profile && !profileError) {
     // Fail-safe: if profile doesn't exist in the database (e.g. registered before trigger activation),
     // we create it now since we are logged in and RLS allows inserting our own profile.
     const meta = session.user.user_metadata || {};
@@ -1714,11 +1723,19 @@ async function loadAppData() {
   }
   
   // Load events (RLS returns own + friends' events)
-  const { data: events } = await arctimeGetEvents(0, 6);
+  const eventsResult = await arctimeGetEvents(0, 6);
+  if (eventsResult.error) {
+    console.error('Failed to load events from Supabase:', eventsResult.error);
+  }
+  const events = eventsResult.data;
   state.events = events ? events.map(mapDbEventToAppEvent) : [];
   
   // Load friendships (get connected friends' profiles)
-  const { data: friends } = await arctimeGetFriends(session.user.id);
+  const friendsResult = await arctimeGetFriends(session.user.id);
+  if (friendsResult.error) {
+    console.error('Failed to load friendships from Supabase:', friendsResult.error);
+  }
+  const friends = friendsResult.data;
   state.friendsData = friends || [];
   state.friends = {};
   state.friendsData.forEach(f => {
@@ -1969,6 +1986,12 @@ function openSettings() {
   settingsUserUsername.value = state.usernameHandle;
   settingsPrivacy.value = state.privacyLevel;
   settingsAvatarPreview.src = state.avatar;
+  
+  const settingsEmail = document.getElementById('settingsEmail');
+  if (settingsEmail && state.user) {
+    settingsEmail.value = state.user.email || '';
+  }
+  
   settingsUsernameWarning.style.display = 'none';
   
   settingsDrawer.classList.add('open');
