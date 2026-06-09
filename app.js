@@ -1618,7 +1618,42 @@ function addSignOutButton() {
   btn.addEventListener('click', handleLogout);
   profileCard.parentNode.insertBefore(btn, profileCard.nextSibling);
   
-  const drawerSignOut = document.getElementById('drawerSignOutBtn');
+  let drawerSignOut = document.getElementById('drawerSignOutBtn');
+  if (!drawerSignOut) {
+    // Fallback: If the HTML is cached and does not have the button in DOM, inject it dynamically!
+    const drawerContent = document.querySelector('#settingsDrawerInner .drawer-content') || document.querySelector('#settingsDrawer .drawer-content');
+    if (drawerContent) {
+      const wrapperDiv = document.createElement('div');
+      wrapperDiv.style.borderTop = '1px solid rgba(255, 255, 255, 0.08)';
+      wrapperDiv.style.marginTop = '16px';
+      wrapperDiv.style.paddingTop = '16px';
+      
+      const injectBtn = document.createElement('button');
+      injectBtn.type = 'button';
+      injectBtn.className = 'user-menu-btn';
+      injectBtn.id = 'drawerSignOutBtn';
+      injectBtn.style.width = '100%';
+      injectBtn.style.display = 'flex';
+      injectBtn.style.alignItems = 'center';
+      injectBtn.style.justifyContent = 'center';
+      injectBtn.style.gap = '8px';
+      injectBtn.style.padding = '12px';
+      injectBtn.style.background = 'rgba(239, 68, 68, 0.1)';
+      injectBtn.style.border = '1px solid rgba(239, 68, 68, 0.15)';
+      injectBtn.style.color = '#ef4444';
+      injectBtn.style.borderRadius = '10px';
+      injectBtn.style.cursor = 'pointer';
+      injectBtn.style.fontSize = '13px';
+      injectBtn.style.fontWeight = '600';
+      injectBtn.style.transition = 'all 0.2s';
+      injectBtn.innerHTML = '<i data-lucide="log-out" style="width: 16px; height: 16px;"></i> Sign Out';
+      
+      wrapperDiv.appendChild(injectBtn);
+      drawerContent.appendChild(wrapperDiv);
+      drawerSignOut = injectBtn;
+    }
+  }
+  
   if (drawerSignOut) {
     // Remove old listeners by cloning or just clear and re-add
     const newDrawerSignOut = drawerSignOut.cloneNode(true);
