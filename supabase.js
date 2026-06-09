@@ -82,8 +82,7 @@ async function arctimeCreateProfile(profile) {
 async function arctimeUpdateProfile(userId, updates) {
   const { data, error } = await sb
     .from('profiles')
-    .update(updates)
-    .eq('id', userId)
+    .upsert({ id: userId, ...updates })
     .select()
     .single();
   return { data, error };
