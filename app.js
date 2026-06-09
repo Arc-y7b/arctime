@@ -637,6 +637,24 @@ function renderCalendar() {
         // Round to nearest 30 mins
         const roundedMin = Math.round(clickedMinTotal / 30) * 30;
         
+        const today = new Date();
+        const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const dateOfColumn = getDateOfIndex(d);
+        const columnStart = new Date(dateOfColumn.getFullYear(), dateOfColumn.getMonth(), dateOfColumn.getDate());
+        
+        if (columnStart < todayStart) {
+          showToast('Cannot book slots in the past!', 'info');
+          return;
+        }
+        
+        if (columnStart.getTime() === todayStart.getTime()) {
+          const currentMin = today.getHours() * 60 + today.getMinutes();
+          if (roundedMin < currentMin) {
+            showToast('Cannot book slots in the past!', 'info');
+            return;
+          }
+        }
+        
         const startTimeStr = minutesToTimeStr(roundedMin);
         const endTimeStr = minutesToTimeStr(roundedMin + 60); // 1h duration default
         
@@ -816,9 +834,22 @@ function renderCalendar() {
     // 2. Render Common Free Slots (Highlight Overlaps overlay)
     // Only highlight if common highlighting is active AND we have friends selected
     if (state.highlightCommonFree && state.selectedFriends.length > 0) {
-      const dayCommonSlots = calculateCommonFreeSlots(state.durationMinutes)
+      let dayCommonSlots = calculateCommonFreeSlots(state.durationMinutes)
         .map(slotToDisplay)
         .filter(s => s.dayIndex === d);
+        
+      // Filter out past slots
+      const today = new Date();
+      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const dateOfColumn = getDateOfIndex(d);
+      const columnStart = new Date(dateOfColumn.getFullYear(), dateOfColumn.getMonth(), dateOfColumn.getDate());
+      
+      if (columnStart < todayStart) {
+        dayCommonSlots = [];
+      } else if (columnStart.getTime() === todayStart.getTime()) {
+        const currentMin = today.getHours() * 60 + today.getMinutes();
+        dayCommonSlots = dayCommonSlots.filter(slot => slot.start >= currentMin);
+      }
       
       dayCommonSlots.forEach(slot => {
         const slotDiv = document.createElement('div');
@@ -870,7 +901,25 @@ function updateSmartSuggestions() {
   }
   
   const duration = state.durationMinutes;
-  const commonSlots = calculateCommonFreeSlots(duration).map(slotToDisplay);
+  let commonSlots = calculateCommonFreeSlots(duration).map(slotToDisplay);
+  
+  // Filter out past slots
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const currentMin = today.getHours() * 60 + today.getMinutes();
+  
+  commonSlots = commonSlots.filter(slot => {
+    const dateOfColumn = getDateOfIndex(slot.dayIndex);
+    const columnStart = new Date(dateOfColumn.getFullYear(), dateOfColumn.getMonth(), dateOfColumn.getDate());
+    
+    if (columnStart < todayStart) {
+      return false;
+    }
+    if (columnStart.getTime() === todayStart.getTime()) {
+      return slot.start >= currentMin;
+    }
+    return true;
+  });
   
   if (commonSlots.length === 0) {
     suggestionsList.innerHTML = `
@@ -1250,6 +1299,30 @@ bookingForm.addEventListener('submit', async (e) => {
     return;
   }
   
+  // Prevent booking new events in the past
+  if (!state.editingEventId) {
+    const today = new Date();
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const [startHour, startMin] = startTimeStr.split(':').map(Number);
+    
+    const dateOfColumn = getDateOfIndex(displayDayIndex);
+    const columnStart = new Date(dateOfColumn.getFullYear(), dateOfColumn.getMonth(), dateOfColumn.getDate());
+    
+    if (columnStart < todayStart) {
+      showToast('Cannot book slots in the past!', 'info');
+      return;
+    }
+    
+    if (columnStart.getTime() === todayStart.getTime()) {
+      const currentMin = today.getHours() * 60 + today.getMinutes();
+      const bookingMin = startHour * 60 + startMin;
+      if (bookingMin < currentMin) {
+        showToast('Cannot book slots in the past!', 'info');
+        return;
+      }
+    }
+  }
+  
   // Convert Display time to GMT for database storage
   const gmtTimes = displayToGmt(displayDayIndex, startTimeStr);
   const gmtDayIndex = gmtTimes.dayIndex;
@@ -1573,6 +1646,7 @@ async function loadAppData() {
     state.usernameHandle = profile.username || '';
     state.avatar = profile.avatar_url || state.avatar;
     state.timezone = profile.timezone || 'BST';
+    state.privacyLevel = profile.privacy_level || 'freebusy';
   }
   
   // Load events (RLS returns own + friends' events)
@@ -2042,6 +2116,11 @@ saveSettingsBtn.addEventListener('click', () => {
     username: state.usernameHandle,
     privacy_level: state.privacyLevel,
     avatar_url: state.avatar
+  }).then(({ error }) => {
+    if (error) {
+      console.error('Failed to update profile in Supabase:', error);
+      showToast('Cloud sync failed: ' + error.message, 'info');
+    }
   });
   
   // Update UI Card
