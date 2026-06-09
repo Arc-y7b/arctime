@@ -11,14 +11,14 @@ The desktop calendar coordination grid is designed for widescreen monitors. On m
 
 ```mermaid
 graph TD
-    subgraph Mobile UI Layout (Portrait)
+    subgraph "Mobile UI Layout (Portrait)"
         NavHeader[Mobile Nav Header: Month/Year Display & Navigation]
         DayPickerBar[Horizontal Day Picker: Scrollable M T W T F S S]
         ActiveTimeline[Single Day Timeline: 24h Vertical Grid]
-        BottomNavBar[Bottom Action Bar: Calendar | Friends Hub | Suggestions | Settings]
+        BottomNavBar["Bottom Action Bar: Calendar | Friends Hub | Suggestions | Settings"]
     end
     
-    subgraph Modals & Bottom Sheets
+    subgraph "Modals & Bottom Sheets"
         BottomSheet[Booking & Profile Form: Slide-up Bottom Sheet]
     end
 
@@ -43,28 +43,25 @@ We extend the core ArcTime calendar domain model to incorporate mobile adaptive 
 ```mermaid
 classDiagram
     class ViewportBoundary {
-        <<Value Object>>
         +width: number
         +height: number
-        +isMobile(): boolean
-        +orientation(): string
+        +isMobile() boolean
+        +orientation() string
     }
 
     class MobileCalendarState {
-        <<Aggregate Root>>
         +activeDate: Date
-        +activeTab: string ("calendar" | "friends" | "suggestions" | "settings")
+        +activeTab: string
         +isBottomSheetOpen: boolean
-        +changeActiveDay(dayOffset: number)
-        +switchTab(tabName: string)
+        +changeActiveDay(dayOffset)
+        +switchTab(tabName)
     }
 
     class DisplaySlot {
-        <<Entity>>
         +displayDayIndex: number
         +startMin: number
         +endMin: number
-        +isPast(currentTime: Date): boolean
+        +isPast(currentTime) boolean
     }
 
     MobileCalendarState --> ViewportBoundary
