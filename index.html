@@ -440,11 +440,17 @@
           </div>
         </div>
 
-        <div class="form-group" id="repeatAllWeekGroup" style="margin-top: 10px;">
-          <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; cursor: pointer; color: var(--text-primary);">
-            <input type="checkbox" id="repeatAllWeek" style="accent-color: var(--accent-primary); width: 16px; height: 16px; margin: 0;">
-            <span>Repeat all week (Mon–Sun) 🔁</span>
-          </label>
+        <div class="form-group" id="daySelectorGroup" style="margin-top: 10px;">
+          <label style="font-size: 13px; font-weight: 600; color: var(--text-primary);">Select Days</label>
+          <div class="weekday-selector" style="display: flex; gap: 8px; margin-top: 6px; justify-content: space-between;">
+            <button type="button" class="weekday-btn" data-day="0" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary); font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;">M</button>
+            <button type="button" class="weekday-btn" data-day="1" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary); font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;">T</button>
+            <button type="button" class="weekday-btn" data-day="2" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary); font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;">W</button>
+            <button type="button" class="weekday-btn" data-day="3" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary); font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;">T</button>
+            <button type="button" class="weekday-btn" data-day="4" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary); font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;">F</button>
+            <button type="button" class="weekday-btn" data-day="5" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary); font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;">S</button>
+            <button type="button" class="weekday-btn" data-day="6" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-secondary); font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;">S</button>
+          </div>
         </div>
 
         <div class="form-row">

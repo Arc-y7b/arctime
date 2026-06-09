@@ -1825,6 +1825,14 @@ body {
   display: none;
 }
 
+/* Weekday Selector Button Active State */
+.weekday-btn.active {
+  background: var(--accent-primary) !important;
+  border-color: var(--accent-primary) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+}
+
 /* ============================================================
    MOBILE RESPONSIVE STYLES (PORTRAIT VIEWPORTS)
    ============================================================ */

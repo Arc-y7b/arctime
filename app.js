@@ -1223,7 +1223,7 @@ function openBookingModal(dayIndex, startTimeStr = '12:00', endTimeStr = '13:00'
       typeRadio.dispatchEvent(new Event('change'));
     }
     
-    const repeatGroup = document.getElementById('repeatAllWeekGroup');
+    const repeatGroup = document.getElementById('daySelectorGroup');
     if (repeatGroup) repeatGroup.style.display = 'none';
   } else {
     if (modalTitleEl) modalTitleEl.textContent = 'Book Group Activity';
@@ -1240,10 +1240,18 @@ function openBookingModal(dayIndex, startTimeStr = '12:00', endTimeStr = '13:00'
       personalRadio.dispatchEvent(new Event('change'));
     }
     
-    const repeatGroup = document.getElementById('repeatAllWeekGroup');
+    const repeatGroup = document.getElementById('daySelectorGroup');
     if (repeatGroup) repeatGroup.style.display = 'block';
-    const repeatCheckbox = document.getElementById('repeatAllWeek');
-    if (repeatCheckbox) repeatCheckbox.checked = false;
+    
+    // Set active states on weekday buttons
+    document.querySelectorAll('.weekday-btn').forEach(btn => {
+      const d = parseInt(btn.dataset.day, 10);
+      if (d === targetDayIndex) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
   }
   
   const targetDate = getDateOfIndex(targetDayIndex);
@@ -1309,35 +1317,26 @@ bookingForm.addEventListener('submit', async (e) => {
   
   // Gather checked invitees
   const checkboxes = document.querySelectorAll('input[name="invitedFriend"]:checked');
-  const invitees = Array.from(checkboxes).map(cb => cb.value);
+  const activeButtons = document.querySelectorAll('.weekday-btn.active');
+  const selectedDays = Array.from(activeButtons).map(btn => parseInt(btn.dataset.day, 10));
   
-  // Determine dayIndex relative to currentWeekStart
-  const [year, month, day] = rawDate.split('-').map(Number);
-  const bookingDate = new Date(year, month - 1, day);
-  const startCopy = new Date(state.currentWeekStart);
-  startCopy.setHours(0,0,0,0);
-  bookingDate.setHours(0,0,0,0);
-  
-  const timeDiff = bookingDate.getTime() - startCopy.getTime();
-  const displayDayIndex = Math.round(timeDiff / (1000 * 60 * 60 * 24));
-  
-  if (displayDayIndex < 0 || displayDayIndex > 6) {
-    showToast('Please choose a date within the current week view!', 'info');
+  if (selectedDays.length === 0) {
+    showToast('Please select at least one day!', 'info');
     return;
   }
   
-  // Prevent booking events in the past (unless repeating for the whole week)
+  const isMultiDay = selectedDays.length > 1;
+  
+  // Prevent booking events in the past (only for single day bookings)
   const today = new Date();
   const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const [startHour, startMin] = startTimeStr.split(':').map(Number);
   
-  const repeatCheckbox = document.getElementById('repeatAllWeek');
-  const repeatAllWeek = repeatCheckbox ? repeatCheckbox.checked : false;
-  
-  const dateOfColumn = getDateOfIndex(displayDayIndex);
-  const columnStart = new Date(dateOfColumn.getFullYear(), dateOfColumn.getMonth(), dateOfColumn.getDate());
-  
-  if (!repeatAllWeek) {
+  if (!isMultiDay) {
+    const targetDay = selectedDays[0];
+    const dateOfColumn = getDateOfIndex(targetDay);
+    const columnStart = new Date(dateOfColumn.getFullYear(), dateOfColumn.getMonth(), dateOfColumn.getDate());
+    
     if (columnStart < todayStart) {
       showToast('Cannot book slots in the past!', 'info');
       return;
@@ -1353,22 +1352,22 @@ bookingForm.addEventListener('submit', async (e) => {
     }
   }
   
-  // Convert Display time to GMT for database storage
-  const gmtTimes = displayToGmt(displayDayIndex, startTimeStr);
-  const gmtDayIndex = gmtTimes.dayIndex;
-  const gmtStartTime = gmtTimes.timeStr;
-  
-  const startMinGmt = timeToMinutes(gmtStartTime);
-  const endMinGmt = startMinGmt + duration;
-  const gmtEndTime = minutesToTimeStr(endMinGmt);
-  
-  if (endMinGmt > 1440) {
-    showToast('Activity must finish before midnight!', 'info');
-    return;
-  }
-  
   // EDIT: update existing event
   if (state.editingEventId) {
+    const targetDay = selectedDays[0];
+    const gmtTimes = displayToGmt(targetDay, startTimeStr);
+    const gmtDayIndex = gmtTimes.dayIndex;
+    const gmtStartTime = gmtTimes.timeStr;
+    
+    const startMinGmt = timeToMinutes(gmtStartTime);
+    const endMinGmt = startMinGmt + duration;
+    const gmtEndTime = minutesToTimeStr(endMinGmt);
+    
+    if (endMinGmt > 1440) {
+      showToast('Activity must finish before midnight!', 'info');
+      return;
+    }
+
     const { error: updateError } = await arctimeUpdateEvent(state.editingEventId, {
       title,
       day_index: gmtDayIndex,
@@ -1384,13 +1383,6 @@ bookingForm.addEventListener('submit', async (e) => {
       return;
     }
     
-    // Update attendees if group event
-    if (eventType === 'group') {
-      // Remove old attendees, add new ones
-      // For simplicity, we re-add attendees
-      // In production, you'd diff the lists
-    }
-    
     await saveEventsToStorage();
     closeBookingModal();
     addNotification('Slot Updated', `Updated details for "${title}"`, 'info');
@@ -1401,9 +1393,9 @@ bookingForm.addEventListener('submit', async (e) => {
   }
   
   // CREATE new event(s)
-  if (repeatAllWeek) {
+  if (isMultiDay) {
     const promises = [];
-    for (let d = 0; d < 7; d++) {
+    selectedDays.forEach(d => {
       const gmtT = displayToGmt(d, startTimeStr);
       const gmtD = gmtT.dayIndex;
       const gmtS = gmtT.timeStr;
@@ -1412,21 +1404,19 @@ bookingForm.addEventListener('submit', async (e) => {
       const endMinG = startMinG + duration;
       const gmtE = minutesToTimeStr(endMinG);
       
-      if (endMinG > 1440) {
-        continue;
+      if (endMinG <= 1440) {
+        promises.push(arctimeCreateEvent({
+          user_id: state.userId,
+          title,
+          day_index: gmtD,
+          start_time: gmtS,
+          end_time: gmtE,
+          event_type: eventType,
+          category,
+          notes
+        }));
       }
-      
-      promises.push(arctimeCreateEvent({
-        user_id: state.userId,
-        title,
-        day_index: gmtD,
-        start_time: gmtS,
-        end_time: gmtE,
-        event_type: eventType,
-        category,
-        notes
-      }));
-    }
+    });
     
     const results = await Promise.all(promises);
     
@@ -1447,6 +1437,20 @@ bookingForm.addEventListener('submit', async (e) => {
       await Promise.all(attendeePromises);
     }
   } else {
+    const targetDay = selectedDays[0];
+    const gmtTimes = displayToGmt(targetDay, startTimeStr);
+    const gmtDayIndex = gmtTimes.dayIndex;
+    const gmtStartTime = gmtTimes.timeStr;
+    
+    const startMinGmt = timeToMinutes(gmtStartTime);
+    const endMinGmt = startMinGmt + duration;
+    const gmtEndTime = minutesToTimeStr(endMinGmt);
+    
+    if (endMinGmt > 1440) {
+      showToast('Activity must finish before midnight!', 'info');
+      return;
+    }
+
     const { data: newEvent, error: createError } = await arctimeCreateEvent({
       user_id: state.userId,
       title,
@@ -1473,14 +1477,14 @@ bookingForm.addEventListener('submit', async (e) => {
   closeBookingModal();
   
   if (eventType === 'personal') {
-    if (repeatAllWeek) {
-      addNotification('Calendar Blocked', `Blocked personal busy times for the week: "${title}"`, 'warning');
+    if (isMultiDay) {
+      addNotification('Calendar Blocked', `Blocked personal busy times for selected days: "${title}"`, 'warning');
     } else {
       addNotification('Calendar Blocked', `Blocked personal busy time: "${title}"`, 'warning');
     }
   } else {
-    if (repeatAllWeek) {
-      addNotification('Group Plans Booked', `Successfully booked weekly "${title}" plans!`, 'success');
+    if (isMultiDay) {
+      addNotification('Group Plans Booked', `Successfully booked plans for selected days: "${title}"`, 'success');
     } else {
       addNotification('Group Plan Booked', `Successfully booked "${title}" together!`, 'success');
     }
@@ -1489,6 +1493,13 @@ bookingForm.addEventListener('submit', async (e) => {
   renderCalendar();
   renderSharedEventsWidget();
   updateSmartSuggestions();
+});
+
+// Toggle active status for weekday selector buttons in booking modal
+document.querySelectorAll('.weekday-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    btn.classList.toggle('active');
+  });
 });
 
 // Modal close button connections
