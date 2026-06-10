@@ -99,14 +99,16 @@ CREATE POLICY "friend_requests_select" ON public.friend_requests
   FOR SELECT USING (sender_id = auth.uid() OR receiver_id = auth.uid());
 CREATE POLICY "friend_requests_update_receiver" ON public.friend_requests
   FOR UPDATE USING (receiver_id = auth.uid());
-CREATE POLICY "friend_requests_delete_sender" ON public.friend_requests
-  FOR DELETE USING (sender_id = auth.uid());
+CREATE POLICY "friend_requests_delete" ON public.friend_requests
+  FOR DELETE USING (sender_id = auth.uid() OR receiver_id = auth.uid());
 
 -- 3d. FRIENDSHIPS
 CREATE POLICY "friendships_select" ON public.friendships
   FOR SELECT USING (auth.uid() IN (user_id_1, user_id_2));
 CREATE POLICY "friendships_insert" ON public.friendships
   FOR INSERT WITH CHECK (auth.uid() IN (user_id_1, user_id_2));
+CREATE POLICY "friendships_delete" ON public.friendships
+  FOR DELETE USING (auth.uid() = user_id_1 OR auth.uid() = user_id_2);
 
 -- 3e. EVENT ATTENDEES (references friendships)
 CREATE POLICY "event_attendees_select" ON public.event_attendees

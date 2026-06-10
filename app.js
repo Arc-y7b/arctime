@@ -2522,7 +2522,12 @@ function renderDirectory() {
 async function removeFriend(friendId) {
   const friendName = state.friends[friendId]?.name || 'Unknown';
   
-  await arctimeRemoveFriend(state.userId, friendId);
+  const { error } = await arctimeRemoveFriend(state.userId, friendId);
+  if (error) {
+    console.error('Failed to remove friend from Supabase:', error);
+    showToast('Failed to remove friend: ' + error.message, 'info');
+    return;
+  }
   
   delete state.friends[friendId];
   state.selectedFriends = state.selectedFriends.filter(id => id !== friendId);

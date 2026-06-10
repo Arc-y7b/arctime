@@ -238,12 +238,31 @@ async function arctimeCancelFriendRequest(requestId) {
 async function arctimeRemoveFriend(userId, friendId) {
   const id1 = userId < friendId ? userId : friendId;
   const id2 = userId < friendId ? friendId : userId;
-  const { error } = await sb
+  
+  // 1. Delete friendship row
+  const { error: friendshipError } = await sb
     .from('friendships')
     .delete()
     .eq('user_id_1', id1)
     .eq('user_id_2', id2);
-  return { error };
+  if (friendshipError) return { error: friendshipError };
+
+  // 2. Delete corresponding friend requests in both directions so they can add each other later
+  const { error: reqError1 } = await sb
+    .from('friend_requests')
+    .delete()
+    .eq('sender_id', userId)
+    .eq('receiver_id', friendId);
+  if (reqError1) return { error: reqError1 };
+
+  const { error: reqError2 } = await sb
+    .from('friend_requests')
+    .delete()
+    .eq('sender_id', friendId)
+    .eq('receiver_id', userId);
+  if (reqError2) return { error: reqError2 };
+
+  return { error: null };
 }
 
 async function arctimeGetFriends(userId) {
