@@ -218,7 +218,7 @@ async function arctimeAcceptFriendRequest(requestId) {
 async function arctimeDeclineFriendRequest(requestId) {
   const { error } = await sb
     .from('friend_requests')
-    .update({ status: 'declined' })
+    .delete()
     .eq('id', requestId);
   return { error };
 }

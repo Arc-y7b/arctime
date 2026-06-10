@@ -1117,7 +1117,12 @@ function openEventActionModal(event, ownerName, displayTitle, displayDayName, st
     
     // Delete button handler (Supabase-backed)
     deleteBtn.onclick = async () => {
-      await arctimeDeleteEvent(event.id);
+      const { error } = await arctimeDeleteEvent(event.id);
+      if (error) {
+        console.error('Failed to delete event from Supabase:', error);
+        showToast('Failed to delete event: ' + error.message, 'info');
+        return;
+      }
       state.events = state.events.filter(ev => ev.id !== event.id);
       addNotification('Slot Removed', `Removed personal slot: "${event.title}"`, 'info');
       renderCalendar();
@@ -1138,7 +1143,12 @@ function openEventActionModal(event, ownerName, displayTitle, displayDayName, st
     
     // Cancel shared button handler (Supabase-backed)
     cancelSharedBtn.onclick = async () => {
-      await arctimeDeleteEvent(event.id);
+      const { error } = await arctimeDeleteEvent(event.id);
+      if (error) {
+        console.error('Failed to cancel event from Supabase:', error);
+        showToast('Failed to cancel event: ' + error.message, 'info');
+        return;
+      }
       state.events = state.events.filter(ev => ev.id !== event.id);
       addNotification('Event Cancelled', `Cancelled shared event: ${event.title}`, 'warning');
       renderCalendar();
@@ -1434,7 +1444,12 @@ bookingForm.addEventListener('submit', async (e) => {
           attendeePromises.push(arctimeAddAttendees(res.data.id, invitees));
         }
       });
-      await Promise.all(attendeePromises);
+      const attendeeResults = await Promise.all(attendeePromises);
+      const attendeeErrors = attendeeResults.filter(r => r.error);
+      if (attendeeErrors.length > 0) {
+        console.error('Failed to add attendees for some repeating events:', attendeeErrors.map(f => f.error));
+        showToast('Warning: Failed to invite friends to some repeating group events!', 'info');
+      }
     }
   } else {
     const targetDay = selectedDays[0];
@@ -1469,7 +1484,11 @@ bookingForm.addEventListener('submit', async (e) => {
     
     // Add attendees for group events
     if (eventType === 'group' && invitees.length > 0) {
-      await arctimeAddAttendees(newEvent.id, invitees);
+      const { error: attendeeError } = await arctimeAddAttendees(newEvent.id, invitees);
+      if (attendeeError) {
+        console.error('Failed to add attendees in Supabase:', attendeeError);
+        showToast('Warning: Failed to invite friends to group event!', 'info');
+      }
     }
   }
   
@@ -1550,9 +1569,21 @@ findTimesBtn.addEventListener('click', () => {
 });
 
 // Timezone selector handler
-timezoneSelect.addEventListener('change', (e) => {
-  state.timezone = e.target.value;
-  addNotification('Timezone Switched', `Active timezone set to ${state.timezone}`, 'info');
+timezoneSelect.addEventListener('change', async (e) => {
+  const newTz = e.target.value;
+  const originalTz = state.timezone;
+  state.timezone = newTz;
+  
+  const { error } = await arctimeUpdateProfile(state.userId, { timezone: newTz });
+  if (error) {
+    console.error('Failed to save timezone to Supabase:', error);
+    showToast('Failed to save timezone preference: ' + error.message, 'info');
+    state.timezone = originalTz;
+    timezoneSelect.value = originalTz;
+  } else {
+    addNotification('Timezone Switched', `Active timezone set to ${newTz}`, 'info');
+  }
+  
   renderCalendarHeader();
   renderCalendar();
   updateSmartSuggestions();
@@ -2288,23 +2319,26 @@ saveSettingsBtn.addEventListener('click', () => {
   }
   
   settingsUsernameWarning.style.display = 'none';
+  
+  // Save to Supabase first before updating local state
+  const { error } = await arctimeUpdateProfile(state.userId, {
+    display_name: newUsername,
+    username: newHandle,
+    privacy_level: settingsPrivacy.value,
+    avatar_url: settingsAvatarPreview.src
+  });
+  
+  if (error) {
+    console.error('Failed to update profile in Supabase:', error);
+    showToast('Failed to save settings: ' + error.message, 'info');
+    return;
+  }
+  
+  // Update local state only on database success
   state.username = newUsername;
   state.usernameHandle = newHandle;
   state.privacyLevel = settingsPrivacy.value;
   state.avatar = settingsAvatarPreview.src;
-  
-  // Save to Supabase
-  arctimeUpdateProfile(state.userId, {
-    display_name: state.username,
-    username: state.usernameHandle,
-    privacy_level: state.privacyLevel,
-    avatar_url: state.avatar
-  }).then(({ error }) => {
-    if (error) {
-      console.error('Failed to update profile in Supabase:', error);
-      showToast('Cloud sync failed: ' + error.message, 'info');
-    }
-  });
   
   // Update UI Card
   userProfileName.textContent = state.username;
@@ -2645,7 +2679,7 @@ async function acceptRequest(idx) {
   
   // Reload events to include new friend's calendar
   const { data: events } = await arctimeGetEvents(0, 6);
-  if (events) state.events = events;
+  if (events) state.events = events.map(mapDbEventToAppEvent);
   
   renderFriendsSidebar();
   renderActiveAttendeeChips();
@@ -2659,7 +2693,12 @@ async function acceptRequest(idx) {
 // Decline Request (Supabase-backed)
 async function declineRequest(idx) {
   const req = state.incomingRequests[idx];
-  await arctimeDeclineFriendRequest(req.id);
+  const { error } = await arctimeDeclineFriendRequest(req.id);
+  if (error) {
+    console.error('Failed to decline request in Supabase:', error);
+    showToast('Failed to decline request: ' + error.message, 'info');
+    return;
+  }
   state.incomingRequests.splice(idx, 1);
   renderFriendsHub();
   addNotification('Request Declined', `Declined friend request`, 'info');
@@ -2668,7 +2707,12 @@ async function declineRequest(idx) {
 // Cancel Sent Request (Supabase-backed)
 async function cancelSentRequest(idx) {
   const req = state.sentRequests[idx];
-  await arctimeCancelFriendRequest(req.id);
+  const { error } = await arctimeCancelFriendRequest(req.id);
+  if (error) {
+    console.error('Failed to cancel request in Supabase:', error);
+    showToast('Failed to cancel request: ' + error.message, 'info');
+    return;
+  }
   state.sentRequests.splice(idx, 1);
   renderFriendsHub();
   addNotification('Request Cancelled', `Cancelled friend request to @${req.receiver_username || 'user'}`, 'info');
