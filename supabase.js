@@ -138,11 +138,22 @@ async function arctimeUpdateEvent(eventId, updates) {
 }
 
 async function arctimeDeleteEvent(eventId) {
-  const { error } = await sb
+  const { data, error } = await sb
     .from('events')
     .delete()
-    .eq('id', eventId);
-  return { error };
+    .eq('id', eventId)
+    .select();
+  if (error) return { error };
+  if (!data || data.length === 0) {
+    return {
+      error: new Error(
+        "Event row could not be deleted from Supabase. " +
+        "This usually means the event does not exist, or the 'events_delete_own' policy is missing or blocking the delete. " +
+        "Please run the SQL policies from migration.sql in your Supabase SQL Editor."
+      )
+    };
+  }
+  return { error: null };
 }
 
 // ============================================================
@@ -216,19 +227,41 @@ async function arctimeAcceptFriendRequest(requestId) {
 }
 
 async function arctimeDeclineFriendRequest(requestId) {
-  const { error } = await sb
+  const { data, error } = await sb
     .from('friend_requests')
     .delete()
-    .eq('id', requestId);
-  return { error };
+    .eq('id', requestId)
+    .select();
+  if (error) return { error };
+  if (!data || data.length === 0) {
+    return {
+      error: new Error(
+        "Friend request could not be deleted/declined from Supabase. " +
+        "This usually means the request does not exist, or the 'friend_requests_delete' policy is missing or blocking the delete. " +
+        "Please run the SQL policies from migration.sql in your Supabase SQL Editor."
+      )
+    };
+  }
+  return { error: null };
 }
 
 async function arctimeCancelFriendRequest(requestId) {
-  const { error } = await sb
+  const { data, error } = await sb
     .from('friend_requests')
     .delete()
-    .eq('id', requestId);
-  return { error };
+    .eq('id', requestId)
+    .select();
+  if (error) return { error };
+  if (!data || data.length === 0) {
+    return {
+      error: new Error(
+        "Friend request could not be deleted/cancelled from Supabase. " +
+        "This usually means the request does not exist, or the 'friend_requests_delete' policy is missing or blocking the delete. " +
+        "Please run the SQL policies from migration.sql in your Supabase SQL Editor."
+      )
+    };
+  }
+  return { error: null };
 }
 
 // ============================================================
@@ -239,13 +272,24 @@ async function arctimeRemoveFriend(userId, friendId) {
   const id1 = userId < friendId ? userId : friendId;
   const id2 = userId < friendId ? friendId : userId;
   
-  // 1. Delete friendship row
-  const { error: friendshipError } = await sb
+  // 1. Delete friendship row and check if it actually deleted a row (RLS policy check)
+  const { data, error: friendshipError } = await sb
     .from('friendships')
     .delete()
     .eq('user_id_1', id1)
-    .eq('user_id_2', id2);
+    .eq('user_id_2', id2)
+    .select();
+  
   if (friendshipError) return { error: friendshipError };
+  if (!data || data.length === 0) {
+    return {
+      error: new Error(
+        "Friendship row could not be deleted from Supabase. " +
+        "This usually means the 'friendships_delete' policy is missing or blocking the delete. " +
+        "Please ensure you run all SQL policies in migration.sql in your Supabase SQL Editor."
+      )
+    };
+  }
 
   // 2. Delete corresponding friend requests in both directions so they can add each other later
   const { error: reqError1 } = await sb
