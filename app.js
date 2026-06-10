@@ -2291,7 +2291,7 @@ avatarInput.addEventListener('change', (e) => {
 });
 
 // Save Settings Form
-saveSettingsBtn.addEventListener('click', () => {
+saveSettingsBtn.addEventListener('click', async () => {
   const newUsername = settingsUsername.value.trim();
   if (!newUsername) {
     showToast('Display Name cannot be empty!', 'info');
