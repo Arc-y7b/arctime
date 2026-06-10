@@ -27,6 +27,17 @@ class MockElement {
     this.listeners = {};
     this.innerHTML = '';
     this.textContent = '';
+    this.parentNode = null;
+    this.children = [];
+  }
+
+  appendChild(child) {
+    if (child.parentNode) {
+      child.parentNode.children = child.parentNode.children.filter(c => c !== child);
+    }
+    this.children.push(child);
+    child.parentNode = this;
+    return child;
   }
 
   addEventListener(event, callback) {

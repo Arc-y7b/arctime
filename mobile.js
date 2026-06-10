@@ -108,6 +108,21 @@ export class MobilePresenter {
   switchTab(tabName) {
     this.state.switchTab(tabName);
     
+    // Handle settings inner element relocation for mobile tab view
+    const settingsInner = document.getElementById('settingsDrawerInner');
+    const settingsWrapper = document.getElementById('settingsWrapper');
+    const settingsDrawer = document.getElementById('settingsDrawer');
+    
+    if (tabName === 'settings') {
+      if (settingsInner && settingsWrapper) {
+        settingsWrapper.appendChild(settingsInner);
+      }
+    } else {
+      if (settingsInner && settingsDrawer) {
+        settingsDrawer.appendChild(settingsInner);
+      }
+    }
+    
     // Update container visibilities
     Object.entries(this.tabMap).forEach(([name, { containerId, buttonId }]) => {
       const container = document.getElementById(containerId);

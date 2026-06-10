@@ -49,3 +49,23 @@ test('MobilePresenter switches views and adjusts DOM containers', () => {
   assert.strictEqual(tabFriendsBtn.classList.contains('active'), true);
   assert.strictEqual(tabCalendarBtn.classList.contains('active'), false);
 });
+
+test('MobilePresenter relocates settings inner content when switching tabs', () => {
+  const presenter = new MobilePresenter();
+  
+  const settingsInner = document.getElementById('settingsDrawerInner');
+  const settingsWrapper = document.getElementById('settingsWrapper');
+  const settingsDrawer = document.getElementById('settingsDrawer');
+  
+  // Initially, set parent mock relationships
+  settingsDrawer.appendChild(settingsInner);
+  assert.strictEqual(settingsInner.parentNode, settingsDrawer);
+  
+  // Switch to settings tab
+  presenter.switchTab('settings');
+  assert.strictEqual(settingsInner.parentNode, settingsWrapper);
+  
+  // Switch back to calendar
+  presenter.switchTab('calendar');
+  assert.strictEqual(settingsInner.parentNode, settingsDrawer);
+});

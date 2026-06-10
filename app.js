@@ -2990,29 +2990,6 @@ function updateMobileFabVisibility() {
 function setupMobileAdaptation() {
   mobilePresenter = new MobilePresenter();
   
-  // Custom switchTab override for mobile settings to handle the drawer inner element transfer
-  const originalSwitchTab = mobilePresenter.switchTab;
-  mobilePresenter.switchTab = function(tabName) {
-    const settingsInner = document.getElementById('settingsDrawerInner');
-    const settingsWrapper = document.getElementById('settingsWrapper');
-    const settingsDrawer = document.getElementById('settingsDrawer');
-    
-    if (tabName === 'settings') {
-      if (settingsInner && settingsWrapper) {
-        settingsWrapper.appendChild(settingsInner);
-      }
-    } else {
-      // Put it back to drawer
-      if (settingsInner && settingsDrawer) {
-        settingsDrawer.appendChild(settingsInner);
-      }
-    }
-    
-    // Call the original method
-    originalSwitchTab.call(this, tabName);
-    updateMobileFabVisibility();
-  };
-  
   // Handle resize events
   window.addEventListener('resize', () => {
     mobilePresenter.handleResize();
@@ -3060,6 +3037,7 @@ function setupMobileAdaptation() {
       
       // Always run switchTab in the presenter to update containers correctly and hide inactive ones
       mobilePresenter.switchTab(tabName);
+      updateMobileFabVisibility();
     });
   });
   
