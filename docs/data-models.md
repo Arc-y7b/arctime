@@ -71,7 +71,7 @@ Extended user profile linked 1:1 with Supabase Auth.
 | `id` | `uuid` | PK → auth.users(id) ON DELETE CASCADE | — | Same UUID as the Auth user |
 | `username` | `text` | UNIQUE | — | Unique handle used for friend search (e.g. "aarav") |
 | `display_name` | `text` | | — | Full name shown in the UI (e.g. "Aarav Patel") |
-| `avatar_url` | `text` | | Unsplash default | Profile photo URL or data URL |
+| `avatar_url` | `text` | | Screenshot default | Profile photo URL or data URL |
 | `timezone` | `text` | | `'BST'` | Preferred timezone (BST or GMT) |
 | `created_at` | `timestamptz` | | `now()` | Account creation timestamp |
 
