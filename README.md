@@ -141,9 +141,9 @@ Here is a breakdown of all frontend features in ArcTime, how they behave, and ho
 * **What it does**: Users register with email, password, username, and display name, and sign in. JWT tokens are automatically cached in `localStorage` by Supabase so sessions persist across refreshes.
 * **Database Mapping**: Auth credentials live in the protected `auth.users` table. The trigger function `on_auth_user_created` automatically populates the `public.profiles` table with matching user IDs and metadata.
 
-### 2. Month View Toggle (Status: Future Consideration)
-* **What it does**: You will notice the **Month** view button is currently disabled and shows a *"Month view coming soon"* tooltip on hover. 
-* **Database Mapping**: The month view requires client-side paginated queries to handle larger sets of events. This is listed under **Future Considerations** (Section 13 of [architecture.md](file:///home/aarav/Projects/arctime/docs/architecture.md)) and is not yet implemented. The calendar currently displays in a Weekly grid (Monday–Sunday).
+### 2. Month View Toggle (Status: Complete)
+* **What it does**: Allows users to switch between the standard Weekly grid and a full monthly calendar grid. 
+* **Database Mapping**: Renders events on the days corresponding to the active week in the monthly grid. Clicking any day cell in the active week lets the user book a slot at that date. Clicking a day cell outside the active week switches the calendar's active week to that week. Timezone offsets and privacy overlays are correctly applied to event display pills.
 
 ### 3. Availability status switcher ("Free / Busy")
 * **What it does**: A quick toggle in the sidebar to simulate or display your instant availability.

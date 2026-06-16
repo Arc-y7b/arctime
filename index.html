@@ -182,8 +182,8 @@
         <div class="nav-right">
           <!-- View Modes -->
           <div class="view-toggles">
-            <button class="view-btn active" data-view="week">Week</button>
-            <button class="view-btn" data-view="month" disabled title="Month view coming soon">Month</button>
+            <button class="view-btn active" data-view="week" id="viewWeekBtn">Week</button>
+            <button class="view-btn" data-view="month" id="viewMonthBtn">Month</button>
           </div>
           <!-- Timezone Switcher -->
           <div class="timezone-selector" title="Timezone Mode">
@@ -209,7 +209,7 @@
       <!-- Calendar Container -->
       <div class="calendar-wrapper" id="calendarWrapper">
         <!-- Calendar Grid -->
-        <div class="calendar-grid-container">
+        <div class="calendar-grid-container" id="weekGridContainer">
           <!-- Time Grid Header -->
           <div class="calendar-grid-header" id="calendarGridHeader">
             <div class="time-col-header"></div>
@@ -230,6 +230,11 @@
               </div>
             </div>
           </div>
+        </div>
+
+        <!-- Month Grid Container -->
+        <div class="month-grid-container" id="monthGridContainer" style="display: none;">
+          <!-- Rendered dynamically by JavaScript -->
         </div>
       </div>
 

@@ -147,6 +147,12 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles;
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
+  -- Automatically confirm email addresses on signup
+  UPDATE auth.users
+  SET email_confirmed_at = COALESCE(email_confirmed_at, now()),
+      confirmed_at = COALESCE(confirmed_at, now())
+  WHERE id = new.id;
+
   INSERT INTO public.profiles (id, username, display_name, avatar_url)
   VALUES (
     new.id,
@@ -162,4 +168,3 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
-

@@ -254,7 +254,7 @@ App Container (grid: sidebar | main | scheduler)
 
 - Backend sync (WebSocket / REST API for multi-device coordination)
 - Real-time presence via WebRTC or WebSocket
-- Month view rendering
+- Month view rendering (Completed)
 - Drag-and-drop event rescheduling
 - Recurring events
 - iCal / Google Calendar import/export

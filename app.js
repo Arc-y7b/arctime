@@ -468,6 +468,8 @@ const directoryContainer = document.getElementById('directoryContainer');
 const prevWeekBtn = document.getElementById('prevWeekBtn');
 const nextWeekBtn = document.getElementById('nextWeekBtn');
 const todayBtn = document.getElementById('todayBtn');
+const viewWeekBtn = document.getElementById('viewWeekBtn');
+const viewMonthBtn = document.getElementById('viewMonthBtn');
 
 // Initialize Lucide Icons
 function reloadIcons() {
@@ -634,7 +636,7 @@ function renderTimeLabels() {
 }
 
 // Main rendering of the calendar columns, overlays, and events
-function renderCalendar() {
+function renderWeekView() {
   daysColumnsWrapper.innerHTML = '';
   
   // Add 7 day columns
@@ -904,6 +906,204 @@ function renderCalendar() {
   }
   
   reloadIcons();
+}
+
+function renderMonthView() {
+  const monthContainer = document.getElementById('monthGridContainer');
+  if (!monthContainer) return;
+  
+  monthContainer.innerHTML = '';
+  
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  
+  const activeYear = state.currentWeekStart.getFullYear();
+  const activeMonth = state.currentWeekStart.getMonth();
+  
+  // Create header cells for Mon-Sun
+  DAY_NAMES.forEach(dayName => {
+    const headerCell = document.createElement('div');
+    headerCell.className = 'month-header-cell';
+    headerCell.textContent = dayName.substring(0, 3);
+    monthContainer.appendChild(headerCell);
+  });
+  
+  // Calculate grid start date (Monday of the first week of the month)
+  const firstDayOfMonth = new Date(activeYear, activeMonth, 1);
+  let firstDayOffset = firstDayOfMonth.getDay() - 1; // 0 for Mon, 6 for Sun
+  if (firstDayOffset === -1) firstDayOffset = 6;
+  
+  const gridStartDate = new Date(firstDayOfMonth);
+  gridStartDate.setDate(gridStartDate.getDate() - firstDayOffset);
+  
+  // Define active week start/end dates
+  const activeWeekStart = new Date(state.currentWeekStart);
+  activeWeekStart.setHours(0, 0, 0, 0);
+  const activeWeekEnd = new Date(activeWeekStart);
+  activeWeekEnd.setDate(activeWeekEnd.getDate() + 6);
+  activeWeekEnd.setHours(23, 59, 59, 999);
+  
+  // Render 42 day cells (6 rows * 7 columns)
+  for (let i = 0; i < 42; i++) {
+    const cellDate = new Date(gridStartDate);
+    cellDate.setDate(cellDate.getDate() + i);
+    cellDate.setHours(0, 0, 0, 0);
+    
+    const dayCell = document.createElement('div');
+    dayCell.className = 'month-day-cell';
+    
+    // Check if other month
+    if (cellDate.getMonth() !== activeMonth) {
+      dayCell.classList.add('other-month');
+    }
+    
+    // Check if today
+    if (cellDate.getTime() === todayStart.getTime()) {
+      dayCell.classList.add('is-today');
+    }
+    
+    // Check if active week
+    const isInActiveWeek = cellDate.getTime() >= activeWeekStart.getTime() && cellDate.getTime() <= activeWeekEnd.getTime();
+    if (isInActiveWeek) {
+      dayCell.classList.add('active-week');
+    }
+    
+    // Day number
+    const dayNumber = document.createElement('span');
+    dayNumber.className = 'month-day-number';
+    dayNumber.textContent = cellDate.getDate();
+    dayCell.appendChild(dayNumber);
+    
+    // Events list container
+    const eventsList = document.createElement('div');
+    eventsList.className = 'month-events-list';
+    dayCell.appendChild(eventsList);
+    
+    // If in active week, map to day index (0 to 6) and fetch events
+    let dayIndexInActiveWeek = -1;
+    if (isInActiveWeek) {
+      const diffTime = Math.abs(cellDate - activeWeekStart);
+      dayIndexInActiveWeek = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    }
+    
+    if (dayIndexInActiveWeek >= 0 && dayIndexInActiveWeek <= 6) {
+      const dayEvents = state.events.map(event => {
+        const displayStart = gmtToDisplay(event.dayIndex, event.startTime);
+        const displayEnd = gmtToDisplay(event.dayIndex, event.endTime);
+        return {
+          ...event,
+          displayDayIndex: displayStart.dayIndex,
+          displayStartTime: displayStart.timeStr,
+          displayEndTime: displayEnd.timeStr
+        };
+      }).filter(event => {
+        if (event.displayDayIndex !== dayIndexInActiveWeek) return false;
+        if (event.owner === 'user') return true;
+        if (event.owner === 'shared') return true;
+        if (state.selectedFriends.includes(event.owner)) return true;
+        return false;
+      });
+      
+      // Sort dayEvents by start time
+      dayEvents.sort((a, b) => timeToMinutes(a.displayStartTime) - timeToMinutes(b.displayStartTime));
+      
+      // Render at most 3 events, and "+X more" if exceeded
+      const maxPills = 3;
+      dayEvents.slice(0, maxPills).forEach(event => {
+        const startMin = timeToMinutes(event.displayStartTime);
+        const endMin = timeToMinutes(event.displayEndTime);
+        
+        let primaryColor = '#3b82f6';
+        let ownerName = state.username.split(' ')[0];
+        let displayTitle = event.title;
+        let hoverTitle = `${event.title}\nTime: ${minutesToTwelveHourStr(startMin)} - ${minutesToTwelveHourStr(endMin)} (${state.timezone})\nOwner: ${ownerName}\nNotes: ${event.notes || 'None'}`;
+        
+        const pill = document.createElement('div');
+        pill.className = `month-event-pill ${event.category || 'hangout'}`;
+        
+        if (event.owner === 'shared') {
+          primaryColor = '#06b6d4';
+          ownerName = 'Shared';
+          pill.style.background = 'rgba(6, 182, 212, 0.15)';
+          pill.style.borderLeftColor = '#22d3ee';
+        } else if (event.owner !== 'user') {
+          const friend = state.friends[event.owner];
+          primaryColor = friend ? friend.color : '#64748b';
+          ownerName = friend ? friend.name.split(' ')[0] : 'Friend';
+          pill.style.background = `${primaryColor}22`;
+          pill.style.borderLeftColor = primaryColor;
+        } else {
+          if (state.privacyLevel === 'freebusy') {
+            displayTitle = 'Busy 🔒';
+            hoverTitle = `Busy\nTime: ${minutesToTwelveHourStr(startMin)} - ${minutesToTwelveHourStr(endMin)} (${state.timezone})\n(Details hidden from friends)`;
+            pill.style.background = 'rgba(100, 116, 139, 0.1)';
+            pill.style.borderLeftColor = '#64748b';
+            primaryColor = '#64748b';
+          } else if (state.privacyLevel === 'private') {
+            displayTitle = 'Private Slot 👁️‍🗨️';
+            hoverTitle = `Private Slot\nTime: ${minutesToTwelveHourStr(startMin)} - ${minutesToTwelveHourStr(endMin)} (${state.timezone})\n(Hidden from friends completely)`;
+            pill.style.background = 'rgba(239, 68, 68, 0.05)';
+            pill.style.borderLeftColor = '#ef4444';
+            primaryColor = '#ef4444';
+          } else {
+            pill.style.background = 'rgba(59, 130, 246, 0.15)';
+            pill.style.borderLeftColor = '#3b82f6';
+          }
+        }
+        
+        pill.innerHTML = `
+          <span style="font-weight: 700; color: ${primaryColor}">${minutesToTwelveHourStr(startMin).split(' ')[0]}</span> ${displayTitle}
+        `;
+        pill.title = hoverTitle;
+        
+        pill.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openEventActionModal(event, ownerName, displayTitle, DAY_NAMES[dayIndexInActiveWeek], startMin, endMin);
+        });
+        
+        eventsList.appendChild(pill);
+      });
+      
+      if (dayEvents.length > maxPills) {
+        const moreBadge = document.createElement('span');
+        moreBadge.className = 'month-more-badge';
+        moreBadge.textContent = `+${dayEvents.length - maxPills} more`;
+        eventsList.appendChild(moreBadge);
+      }
+    }
+    
+    // Day cell click logic
+    dayCell.addEventListener('click', () => {
+      if (!isInActiveWeek) {
+        // Switch the active week to the week containing cellDate
+        const clickedMonday = new Date(cellDate);
+        let dayOffset = clickedMonday.getDay() - 1; // 0 for Mon, 6 for Sun
+        if (dayOffset === -1) dayOffset = 6;
+        clickedMonday.setDate(clickedMonday.getDate() - dayOffset);
+        
+        state.currentWeekStart = clickedMonday;
+        renderCalendarHeader();
+        renderCalendar();
+        updateSmartSuggestions();
+        showToast(`Switched active week to start on ${clickedMonday.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`);
+      } else {
+        // In active week, open booking modal
+        openBookingModal(dayIndexInActiveWeek, '09:00', '10:00');
+      }
+    });
+    
+    monthContainer.appendChild(dayCell);
+  }
+  
+  reloadIcons();
+}
+
+function renderCalendar() {
+  if (state.activeView === 'month') {
+    renderMonthView();
+  } else {
+    renderWeekView();
+  }
 }
 
 // Populate the right side smart scheduler suggestion list
@@ -1612,21 +1812,81 @@ document.querySelectorAll('.status-btn').forEach(btn => {
   });
 });
 
-// Week switcher controls
-prevWeekBtn.addEventListener('click', () => {
-  state.currentWeekStart.setDate(state.currentWeekStart.getDate() - 7);
+// Week/Month view switcher controls
+function setViewMode(mode) {
+  state.activeView = mode;
+  
+  const weekGridContainer = document.getElementById('weekGridContainer');
+  const monthGridContainer = document.getElementById('monthGridContainer');
+  
+  if (mode === 'week') {
+    if (viewWeekBtn) viewWeekBtn.classList.add('active');
+    if (viewMonthBtn) viewMonthBtn.classList.remove('active');
+    if (weekGridContainer) weekGridContainer.style.display = 'flex';
+    if (monthGridContainer) monthGridContainer.style.display = 'none';
+  } else {
+    if (viewWeekBtn) viewWeekBtn.classList.remove('active');
+    if (viewMonthBtn) viewMonthBtn.classList.add('active');
+    if (weekGridContainer) weekGridContainer.style.display = 'none';
+    if (monthGridContainer) monthGridContainer.style.display = 'grid';
+  }
+  
   renderCalendarHeader();
   renderCalendar();
-  updateSmartSuggestions();
-  showToast('Switched to previous week');
+}
+
+if (viewWeekBtn && viewMonthBtn) {
+  viewWeekBtn.addEventListener('click', () => setViewMode('week'));
+  viewMonthBtn.addEventListener('click', () => setViewMode('month'));
+}
+
+// Navigation switcher controls
+prevWeekBtn.addEventListener('click', () => {
+  if (state.activeView === 'month') {
+    // Subtract 1 month
+    const curDate = new Date(state.currentWeekStart);
+    curDate.setMonth(curDate.getMonth() - 1);
+    // Align to Monday of that week
+    let offset = curDate.getDay() - 1;
+    if (offset === -1) offset = 6;
+    curDate.setDate(curDate.getDate() - offset);
+    state.currentWeekStart = curDate;
+    
+    renderCalendarHeader();
+    renderCalendar();
+    updateSmartSuggestions();
+    showToast('Switched to previous month');
+  } else {
+    state.currentWeekStart.setDate(state.currentWeekStart.getDate() - 7);
+    renderCalendarHeader();
+    renderCalendar();
+    updateSmartSuggestions();
+    showToast('Switched to previous week');
+  }
 });
 
 nextWeekBtn.addEventListener('click', () => {
-  state.currentWeekStart.setDate(state.currentWeekStart.getDate() + 7);
-  renderCalendarHeader();
-  renderCalendar();
-  updateSmartSuggestions();
-  showToast('Switched to next week');
+  if (state.activeView === 'month') {
+    // Add 1 month
+    const curDate = new Date(state.currentWeekStart);
+    curDate.setMonth(curDate.getMonth() + 1);
+    // Align to Monday of that week
+    let offset = curDate.getDay() - 1;
+    if (offset === -1) offset = 6;
+    curDate.setDate(curDate.getDate() - offset);
+    state.currentWeekStart = curDate;
+    
+    renderCalendarHeader();
+    renderCalendar();
+    updateSmartSuggestions();
+    showToast('Switched to next month');
+  } else {
+    state.currentWeekStart.setDate(state.currentWeekStart.getDate() + 7);
+    renderCalendarHeader();
+    renderCalendar();
+    updateSmartSuggestions();
+    showToast('Switched to next week');
+  }
 });
 
 todayBtn.addEventListener('click', () => {
@@ -1634,7 +1894,11 @@ todayBtn.addEventListener('click', () => {
   renderCalendarHeader();
   renderCalendar();
   updateSmartSuggestions();
-  showToast('Centered to current week view');
+  if (state.activeView === 'month') {
+    showToast('Centered to current month view');
+  } else {
+    showToast('Centered to current week view');
+  }
 });
 
 // -------------------------------------------------------------
@@ -1696,17 +1960,34 @@ document.getElementById('signupForm').addEventListener('submit', async (e) => {
   }
   
   document.getElementById('signupBtn').textContent = 'Creating account...';
-  const { error } = await arctimeSignUp(email, password, displayName, username);
-  document.getElementById('signupBtn').textContent = 'Create Account';
+  const { data, error } = await arctimeSignUp(email, password, displayName, username);
   
   if (error) {
+    document.getElementById('signupBtn').textContent = 'Create Account';
     errorEl.textContent = error.message;
     errorEl.style.display = 'block';
     return;
   }
   
-  showToast('Account created! Check your email for confirmation.', 'success');
-  switchAuthTab('login');
+  // Try to automatically log in the user if a session was returned immediately (e.g. email confirmation is disabled)
+  if (data && data.session) {
+    document.getElementById('signupBtn').textContent = 'Create Account';
+    showToast('Account created! Logging you in...', 'success');
+    await loadAppData();
+  } else {
+    // If no session was returned, try signing in immediately with the password
+    const { data: signInData, error: signInError } = await arctimeSignIn(email, password);
+    document.getElementById('signupBtn').textContent = 'Create Account';
+    
+    if (!signInError && signInData && signInData.session) {
+      showToast('Account created! Logging you in...', 'success');
+      await loadAppData();
+    } else {
+      // Fallback: If both fail to provide a session, email confirmation is likely enabled
+      showToast('Account created! Check your email for confirmation.', 'success');
+      switchAuthTab('login');
+    }
+  }
 });
 
 // Add a sign-out button to the sidebar
