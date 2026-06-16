@@ -1,4 +1,4 @@
-import { ViewportBoundary, MobileCalendarState, SwipeGestureDetector, isPastDay, MobilePresenter } from './mobile.js?v=2.0';
+import { ViewportBoundary, MobileCalendarState, SwipeGestureDetector, isPastDay, MobilePresenter } from './mobile.js?v=3.0';
 
 /**
  * ARCTIME CLIENT ENGINE
