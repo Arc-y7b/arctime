@@ -23,7 +23,7 @@ export class MobileCalendarState {
     this.activeTab = 'calendar';
     this.activeDayIndex = 1; // Default to Tuesday, June 9 (Monday index is 0)
     this.isBottomSheetOpen = false;
-    this.validTabs = ['calendar', 'friends', 'suggestions', 'settings'];
+    this.validTabs = ['calendar', 'friends', 'chats', 'suggestions', 'settings'];
   }
 
   switchTab(tabName) {
@@ -81,6 +81,7 @@ export class MobilePresenter {
     this.tabMap = {
       calendar: { containerId: 'calendarWrapper', buttonId: 'mobileTabCalendar' },
       friends: { containerId: 'friendsWrapper', buttonId: 'mobileTabFriends' },
+      chats: { containerId: 'chatsWrapper', buttonId: 'mobileTabChats' },
       suggestions: { containerId: 'suggestionsWrapper', buttonId: 'mobileTabSuggestions' },
       settings: { containerId: 'settingsWrapper', buttonId: 'mobileTabSettings' }
     };
@@ -97,11 +98,26 @@ export class MobilePresenter {
     if (isMobileMode) {
       this.switchTab(this.state.activeTab);
     } else {
-      // Restore desktop layout displays
-      Object.values(this.tabMap).forEach(({ containerId }) => {
-        const el = document.getElementById(containerId);
-        if (el) el.style.display = '';
+      const desktopTab = ['friends', 'chats'].includes(this.state.activeTab)
+        ? this.state.activeTab
+        : 'calendar';
+
+      Object.entries(this.tabMap).forEach(([name, { containerId }]) => {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        if (name === 'suggestions') {
+          container.style.display = '';
+        } else {
+          container.style.display = name === desktopTab
+            ? (name === 'settings' ? 'block' : 'flex')
+            : 'none';
+        }
       });
+
+      const settingsInner = document.getElementById('settingsDrawerInner');
+      const settingsDrawer = document.getElementById('settingsDrawer');
+      if (settingsInner && settingsDrawer) settingsDrawer.appendChild(settingsInner);
     }
   }
 
@@ -130,7 +146,7 @@ export class MobilePresenter {
       
       if (name === tabName) {
         if (container) {
-          if (name === 'calendar' || name === 'friends' || name === 'suggestions') {
+          if (name === 'calendar' || name === 'friends' || name === 'chats' || name === 'suggestions') {
             container.style.display = 'flex';
           } else {
             container.style.display = 'block';

@@ -35,10 +35,17 @@ test('MobilePresenter switches views and adjusts DOM containers', () => {
   // Verify DOM updates
   const calendarContainer = document.getElementById('calendarWrapper');
   const friendsContainer = document.getElementById('friendsWrapper');
+  const chatsContainer = document.getElementById('chatsWrapper');
   const suggestionsContainer = document.getElementById('suggestionsWrapper');
   const settingsContainer = document.getElementById('settingsWrapper');
 
   assert.strictEqual(friendsContainer.style.display, 'flex');
+  presenter.switchTab('chats');
+  assert.strictEqual(chatsContainer.style.display, 'flex');
+  assert.strictEqual(friendsContainer.style.display, 'none');
+  assert.strictEqual(document.getElementById('mobileTabChats').classList.contains('active'), true);
+  presenter.switchTab('friends');
+  assert.strictEqual(chatsContainer.style.display, 'none');
   assert.strictEqual(calendarContainer.style.display, 'none');
   assert.strictEqual(suggestionsContainer.style.display, 'none');
   assert.strictEqual(settingsContainer.style.display, 'none');
@@ -68,4 +75,16 @@ test('MobilePresenter relocates settings inner content when switching tabs', () 
   // Switch back to calendar
   presenter.switchTab('calendar');
   assert.strictEqual(settingsInner.parentNode, settingsDrawer);
+});
+
+test('MobilePresenter restores only the active view on desktop', () => {
+  const presenter = new MobilePresenter();
+  presenter.switchTab('chats');
+
+  window.innerWidth = 1200;
+  presenter.handleResize();
+
+  assert.strictEqual(document.getElementById('chatsWrapper').style.display, 'flex');
+  assert.strictEqual(document.getElementById('calendarWrapper').style.display, 'none');
+  assert.strictEqual(document.getElementById('friendsWrapper').style.display, 'none');
 });

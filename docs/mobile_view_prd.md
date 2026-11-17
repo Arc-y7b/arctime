@@ -15,7 +15,7 @@ graph TD
         NavHeader[Mobile Nav Header: Month/Year Display & Navigation]
         DayPickerBar[Horizontal Day Picker: Scrollable M T W T F S S]
         ActiveTimeline[Single Day Timeline: 24h Vertical Grid]
-        BottomNavBar["Bottom Action Bar: Calendar | Friends Hub | Suggestions | Settings"]
+        BottomNavBar["Bottom Action Bar: Calendar | Friends | Chats | Suggestions | Settings"]
     end
     
     subgraph "Modals & Bottom Sheets"
@@ -31,7 +31,7 @@ graph TD
 ### Key Mobile Interaction Enhancements
 *   **Single-Day Timeline View**: Instead of a 7-day grid, display one active day column. Use horizontal swiping or a top date slider to switch days.
 *   **Responsive Bottom Sheets**: Modals and settings drawers transition to native-feeling slide-up bottom sheets (`translateY` animations) that occupy up to 90% of the screen height.
-*   **Sticky Bottom Navigation Bar**: Quick-tab switching between Calendar, Friends Hub, Suggestions, and Settings, eliminating the desktop sidebar and header buttons.
+*   **Sticky Bottom Navigation Bar**: Quick-tab switching between Calendar, Friends, Chats, Suggestions, and Settings, eliminating the desktop sidebar and header buttons.
 *   **Optimized Touch Targets**: Interactive grid slots and buttons are sized to at least `48px x 48px` to comply with mobile accessibility standards.
 
 ---
@@ -72,7 +72,7 @@ classDiagram
 *   **Active Day**: The single selected calendar day shown in the viewport.
 *   **Day Selector Slide**: The horizontal header row showing weekdays and calendar numbers, allowing tap selection of the active day.
 *   **Bottom Sheet**: The mobile-adapted form container replacing desktop overlays.
-*   **View Tab**: The active presentation mode (Calendar, Friends, Suggestions, Settings).
+*   **View Tab**: The active presentation mode (Calendar, Friends, Chats, Suggestions, Settings).
 
 ### Domain Events
 *   `ViewportChanged`: Fired when crossing the 768px width boundary.
@@ -129,7 +129,7 @@ We will add a media query layer (`@media (max-width: 767px)`) in [style.css](fil
 
 | Ref | Feature | Mobile Specific Requirement |
 | :--- | :--- | :--- |
-| **F-MOB-1** | **Bottom Navigation** | Sticky tab bar with 4 actions: Calendar, Friends Hub, Suggestions, and Settings. |
+| **F-MOB-1** | **Bottom Navigation** | Sticky tab bar with 5 actions: Calendar, Friends, Chats, Suggestions, and Settings. |
 | **F-MOB-2** | **Day Carousel Selector** | Row of weekday circular indicators showing current active day. Tapping switches day. |
 | **F-MOB-3** | **Slide-up Bottom Sheets** | Modals and settings drawer slide up from the bottom when triggered. |
 | **F-MOB-4** | **Swipe Gestures** | Horizontal swipe gestures on the calendar timeline increment/decrement the selected day. |

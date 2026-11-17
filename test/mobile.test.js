@@ -29,6 +29,8 @@ test('MobileCalendarState navigates tabs and days', () => {
   // Switch tab
   state.switchTab('friends');
   assert.strictEqual(state.activeTab, 'friends');
+  state.switchTab('chats');
+  assert.strictEqual(state.activeTab, 'chats');
 
   // Invalid tab switch should be ignored or throw
   assert.throws(() => state.switchTab('invalid-tab'));

@@ -12,7 +12,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- Supabase JS SDK -->
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <link rel="stylesheet" href="style.css?v=3.0">
+  <link rel="stylesheet" href="style.css?v=3.1">
 </head>
 <body class="dark-mode">
   <div class="wallpaper-background-layer" id="wallpaperBgLayer"></div>
@@ -176,6 +176,9 @@
           <button class="mode-btn" id="showFriendsHubBtn" style="background: none; border: none; color: var(--text-secondary); padding: 6px 14px; border-radius: 9px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s; position: relative;">
             <i data-lucide="users" style="width: 14px; height: 14px;"></i> Friends Hub
             <span class="badge" id="pendingRequestsBadge" style="background: #ef4444; color: white; font-size: 10px; font-weight: 700; width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: absolute; top: -5px; right: -5px; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);">1</span>
+          </button>
+          <button class="mode-btn" id="showChatsBtn" style="background: none; border: none; color: var(--text-secondary); padding: 6px 14px; border-radius: 9px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s;">
+            <i data-lucide="messages-square" style="width: 14px; height: 14px;"></i> Chats
           </button>
         </div>
 
@@ -348,6 +351,33 @@
 
         </div>
       </div>
+      <!-- Chats Container -->
+      <section class="chats-wrapper" id="chatsWrapper" aria-label="Chats with friends" style="display: none;">
+        <aside class="chat-conversations">
+          <div class="chat-conversations-header">
+            <div>
+              <h2>Chats</h2>
+              <p>Conversations with your friends</p>
+            </div>
+            <i data-lucide="messages-square" aria-hidden="true"></i>
+          </div>
+          <div class="chat-empty-list">
+            <i data-lucide="message-circle" aria-hidden="true"></i>
+            <p>Your conversations will appear here.</p>
+          </div>
+        </aside>
+        <div class="chat-conversation-view">
+          <div class="chat-empty-state">
+            <div class="chat-empty-icon"><i data-lucide="message-circle" aria-hidden="true"></i></div>
+            <h2>Chat with your friends</h2>
+            <p>Messaging isn't available yet. Conversations with your connected friends will appear here.</p>
+            <button type="button" class="btn btn-primary" id="openFriendsFromChatsBtn">
+              <i data-lucide="users" aria-hidden="true"></i>
+              Go to Friends
+            </button>
+          </div>
+        </div>
+      </section>
       <!-- Settings Tab Container for Mobile -->
       <div class="settings-wrapper" id="settingsWrapper" style="display: none; padding: 24px; overflow-y: auto; flex-grow: 1;"></div>
     </main>
@@ -781,6 +811,10 @@
       <span>Friends</span>
       <span class="badge" id="mobileFriendsBadge" style="display: none;"></span>
     </button>
+    <button class="mobile-nav-btn" id="mobileTabChats" data-tab="chats">
+      <i data-lucide="messages-square"></i>
+      <span>Chats</span>
+    </button>
     <button class="mobile-nav-btn" id="mobileTabSuggestions" data-tab="suggestions">
       <i data-lucide="sparkles"></i>
       <span>Suggestions</span>
@@ -792,6 +826,6 @@
   </div>
 
   <script src="supabase.js?v=3.0"></script>
-  <script type="module" src="app.js?v=3.0"></script>
+  <script type="module" src="app.js?v=3.1"></script>
 </body>
 </html>

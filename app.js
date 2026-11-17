@@ -1,4 +1,4 @@
-import { ViewportBoundary, MobileCalendarState, SwipeGestureDetector, isPastDay, MobilePresenter } from './mobile.js?v=3.0';
+import { ViewportBoundary, MobileCalendarState, SwipeGestureDetector, isPastDay, MobilePresenter } from './mobile.js?v=3.1';
 
 /**
  * ARCTIME CLIENT ENGINE
@@ -445,8 +445,10 @@ const userProfileAvatar = document.getElementById('userProfileAvatar');
 // Friends Hub View Elements
 const showCalendarBtn = document.getElementById('showCalendarBtn');
 const showFriendsHubBtn = document.getElementById('showFriendsHubBtn');
+const showChatsBtn = document.getElementById('showChatsBtn');
 const calendarWrapper = document.getElementById('calendarWrapper');
 const friendsHubWrapper = document.getElementById('friendsWrapper');
+const chatsWrapper = document.getElementById('chatsWrapper');
 const pendingRequestsBadge = document.getElementById('pendingRequestsBadge');
 const schedulerPanel = document.querySelector('.scheduler-panel');
 
@@ -2661,43 +2663,50 @@ saveSettingsBtn.addEventListener('click', async () => {
 // Toggle Views: Calendar vs Friends Hub
 function toggleViewMode(mode) {
   const appContainer = document.querySelector('.app-container');
-  
-  if (mode === 'calendar') {
-    showCalendarBtn.classList.add('active');
-    showFriendsHubBtn.classList.remove('active');
-    
-    showCalendarBtn.style.background = 'rgba(255, 255, 255, 0.08)';
-    showCalendarBtn.style.color = 'var(--text-primary)';
-    showFriendsHubBtn.style.background = 'none';
-    showFriendsHubBtn.style.color = 'var(--text-secondary)';
-    
-    calendarWrapper.style.display = 'flex';
-    friendsHubWrapper.style.display = 'none';
-    
-    appContainer.classList.remove('friends-mode');
-    
+
+  const isCalendar = mode === 'calendar';
+  const isFriends = mode === 'friends-hub';
+  const isChats = mode === 'chats';
+  if (mobilePresenter) {
+    mobilePresenter.state.switchTab(isCalendar ? 'calendar' : isFriends ? 'friends' : 'chats');
+  }
+  const activeButton = isCalendar ? showCalendarBtn : isFriends ? showFriendsHubBtn : showChatsBtn;
+  const viewButtons = [showCalendarBtn, showFriendsHubBtn, showChatsBtn];
+
+  viewButtons.forEach((button) => {
+    const active = button === activeButton;
+    button.classList.toggle('active', active);
+    button.style.background = active ? 'rgba(255, 255, 255, 0.08)' : 'none';
+    button.style.color = active ? 'var(--text-primary)' : 'var(--text-secondary)';
+  });
+
+  calendarWrapper.style.display = isCalendar ? 'flex' : 'none';
+  friendsHubWrapper.style.display = isFriends ? 'flex' : 'none';
+  chatsWrapper.style.display = isChats ? 'flex' : 'none';
+  appContainer.classList.toggle('friends-mode', isFriends);
+  appContainer.classList.toggle('chat-mode', isChats);
+
+  if (isCalendar) {
     renderCalendar();
     updateSmartSuggestions();
-  } else {
-    showCalendarBtn.classList.remove('active');
-    showFriendsHubBtn.classList.add('active');
-    
-    showFriendsHubBtn.style.background = 'rgba(255, 255, 255, 0.08)';
-    showFriendsHubBtn.style.color = 'var(--text-primary)';
-    showCalendarBtn.style.background = 'none';
-    showCalendarBtn.style.color = 'var(--text-secondary)';
-    
-    calendarWrapper.style.display = 'none';
-    friendsHubWrapper.style.display = 'flex';
-    
-    appContainer.classList.add('friends-mode');
-    
+  } else if (isFriends) {
     renderFriendsHub();
   }
 }
 
 showCalendarBtn.addEventListener('click', () => toggleViewMode('calendar'));
 showFriendsHubBtn.addEventListener('click', () => toggleViewMode('friends-hub'));
+showChatsBtn.addEventListener('click', () => toggleViewMode('chats'));
+document.getElementById('openFriendsFromChatsBtn').addEventListener('click', () => {
+  toggleViewMode('friends-hub');
+  if (mobilePresenter && document.body.classList.contains('is-mobile')) {
+    mobilePresenter.switchTab('friends');
+    document.querySelectorAll('.mobile-nav-bar .mobile-nav-btn').forEach((button) => {
+      button.classList.toggle('active', button.dataset.tab === 'friends');
+    });
+    updateMobileFabVisibility();
+  }
+});
 
 // Update Navbar Notification Badge
 function updateBadgeDisplay() {
@@ -3377,6 +3386,8 @@ function setupMobileAdaptation() {
         toggleViewMode('calendar');
       } else if (tabName === 'friends') {
         toggleViewMode('friends-hub');
+      } else if (tabName === 'chats') {
+        toggleViewMode('chats');
       } else if (tabName === 'settings') {
         openSettings();
       }

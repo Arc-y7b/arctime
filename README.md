@@ -77,7 +77,8 @@ ArcTime uses PostgreSQL database tables with strict Row-Level Security (RLS) pol
 ### 5. Mobile Portrait Optimization (< 768px)
 * **Single-Day Timeline Carousel**: Displays one active day at a time in portrait viewports to optimize space.
 * **Swipe Gesture Navigation**: Smooth horizontal swipe gestures on the calendar columns switch the selected day forward/backward.
-* **Responsive Bottom Tab Bar**: Replaces desktop sidebars/headers with active view switching: **Calendar**, **Friends**, **Suggestions**, and **Settings**.
+* **Responsive Bottom Tab Bar**: Replaces desktop sidebars/headers with active view switching: **Calendar**, **Friends**, **Chats**, **Suggestions**, and **Settings**.
+* **Chats View**: A dedicated responsive destination for friend conversations; messaging itself is not connected to a chat service yet.
 * **Transitioning Bottom Sheets**: Desktop settings drawers and booking modals transform into touch-friendly slide-up bottom sheets.
 * **Auto-Saving Settings**: Saving or canceling settings automatically redirects the user back to the Calendar view.
 * **Cache-Busting Integration**: Complete version-query parameters (`?v=2.0`) protect users from old local caching.
