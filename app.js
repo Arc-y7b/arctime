@@ -1435,6 +1435,10 @@ function openBookingModal(dayIndex, startTimeStr = '12:00', endTimeStr = '13:00'
     
     const repeatGroup = document.getElementById('daySelectorGroup');
     if (repeatGroup) repeatGroup.style.display = 'none';
+
+    document.querySelectorAll('.weekday-btn').forEach(btn => {
+      btn.classList.toggle('active', parseInt(btn.dataset.day, 10) === targetDayIndex);
+    });
   } else {
     if (modalTitleEl) modalTitleEl.textContent = 'Book Group Activity';
     if (submitBtnEl) submitBtnEl.textContent = 'Create Shared Event';
@@ -1483,7 +1487,7 @@ function openBookingModal(dayIndex, startTimeStr = '12:00', endTimeStr = '13:00'
   modalFriendsCheckboxContainer.innerHTML = '';
   Object.values(state.friends).forEach(friend => {
     const isChecked = editingEvent
-      ? editingEvent.attendees.includes(friend.id)
+      ? (editingEvent.attendees || []).includes(friend.id)
       : state.selectedFriends.includes(friend.id);
       
     const label = document.createElement('label');
@@ -1890,7 +1894,11 @@ nextWeekBtn.addEventListener('click', () => {
 });
 
 todayBtn.addEventListener('click', () => {
-  state.currentWeekStart = new Date(2026, 5, 8); // Reset back to starting mockup date
+  const today = new Date();
+  const daysSinceMonday = (today.getDay() + 6) % 7;
+  today.setDate(today.getDate() - daysSinceMonday);
+  today.setHours(0, 0, 0, 0);
+  state.currentWeekStart = today;
   renderCalendarHeader();
   renderCalendar();
   updateSmartSuggestions();
