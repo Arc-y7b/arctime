@@ -42,12 +42,16 @@ ArcTime uses PostgreSQL database tables with strict Row-Level Security (RLS) pol
 * **`events`**: Calendar blocks. Can be `personal` (busy slots) or `group` (shared events).
 * **`friend_requests`**: Tracks invitation status (`pending`, `accepted`, `declined`) between users.
 * **`friendships`**: Stores accepted social connections (always ordered as `user_id_1 < user_id_2` to avoid duplicate rows).
+* **`messages`**: Stores direct messages between friends, protected so only accepted conversation participants can read or send them.
 * **`event_attendees`**: Maps users to group events.
 
 ### 2. Row-Level Security (RLS) Policies
 * **Profiles**: Anyone can query profiles to search for friends, but users can only modify their own profile.
 * **Events**: Users can only see events belonging to themselves or their accepted friends. Writing, updating, and deleting events is restricted solely to the owner.
 * **Friendships & Requests**: Users can only view or manage relationships where they are either the sender or receiver.
+* **Messages**: Only the sender and recipient can read messages, and only while they are accepted friends. Users can insert messages as themselves; messages cannot be updated or deleted by the client.
+
+Run [chat-migration.sql](./chat-migration.sql) in the Supabase SQL Editor after [migration.sql](./migration.sql) to create the messages table, access policies, and realtime publication entry.
 
 ---
 
@@ -78,10 +82,10 @@ ArcTime uses PostgreSQL database tables with strict Row-Level Security (RLS) pol
 * **Single-Day Timeline Carousel**: Displays one active day at a time in portrait viewports to optimize space.
 * **Swipe Gesture Navigation**: Smooth horizontal swipe gestures on the calendar columns switch the selected day forward/backward.
 * **Responsive Bottom Tab Bar**: Replaces desktop sidebars/headers with active view switching: **Calendar**, **Friends**, **Chats**, **Suggestions**, and **Settings**.
-* **Chats View**: A dedicated responsive destination for friend conversations; messaging itself is not connected to a chat service yet.
+* **Chats**: Send and receive saved direct messages with accepted friends. Conversation history is paginated, and new messages appear in real time.
 * **Transitioning Bottom Sheets**: Desktop settings drawers and booking modals transform into touch-friendly slide-up bottom sheets.
 * **Auto-Saving Settings**: Saving or canceling settings automatically redirects the user back to the Calendar view.
-* **Cache-Busting Integration**: Complete version-query parameters (`?v=2.0`) protect users from old local caching.
+* **Cache-Busting Integration**: Version-query parameters protect users from stale application assets.
 
 ---
 
@@ -104,7 +108,10 @@ const SUPABASE_URL = 'https://<your-project-id>.supabase.co';
 const SUPABASE_ANON_KEY = '<your-anon-key>';
 ```
 
-### 2. Local Server
+### 2. Database Setup
+Run `migration.sql` once in the Supabase SQL Editor, followed by `chat-migration.sql` to enable the messaging feature. The chat migration is safe to rerun.
+
+### 3. Local Server
 Run a local web server from the project directory:
 
 ```bash
@@ -117,12 +124,12 @@ npx serve .
 
 Open `http://localhost:8000` in your web browser.
 
-### 3. Running Unit Tests
+### 4. Running Unit Tests
 ArcTime features unit testing for its mobile presentation layers and gesture modules using Node's native test runner:
 
 ```bash
 # Run all mobile presenter and gesture spec tests
-node test/mobile.test.js && node test/presenter.test.js
+node test/mobile.test.js && node test/presenter.test.js && node test/chat-api.test.js
 ```
 
 ---
@@ -175,4 +182,8 @@ Here is a breakdown of all frontend features in ArcTime, how they behave, and ho
 ### 9. Real-time Database Syncing
 * **What it does**: If a friend blocks a slot, sends you a request, or updates their schedule, the changes are propagated to your screen instantly without a page refresh.
 * **Database Mapping**: Secured by Supabase Realtime Channels (PostgreSQL changes replication). The browser client subscribes to WebSocket update notifications, which automatically trigger `renderCalendar()` and `updateSmartSuggestions()`.
+
+### 10. Friend Chats
+* **What it does**: Open the Chats destination on desktop or mobile, select an accepted friend, send messages, browse older history, and receive new messages live.
+* **Database Mapping**: Messages are stored in the `messages` table. RLS restricts reads and writes to accepted conversation participants; Supabase Realtime broadcasts inserts to the participants.
 

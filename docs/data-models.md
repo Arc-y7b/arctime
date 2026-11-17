@@ -164,7 +164,28 @@ Bidirectional friendship link between two users. Each pair stored exactly once.
 
 ---
 
-## 7. State Shape (Frontend)
+## 7. Table: `messages`
+
+Direct messages are persisted between accepted friends.
+
+| Column | Type | Constraints | Default | Description |
+|--------|------|-------------|---------|-------------|
+| `id` | `uuid` | PK | `gen_random_uuid()` | Unique message identifier |
+| `sender_id` | `uuid` | FK → profiles(id) ON DELETE CASCADE, NOT NULL | — | Authenticated sender |
+| `recipient_id` | `uuid` | FK → profiles(id) ON DELETE CASCADE, NOT NULL | — | Friend receiving the message |
+| `content` | `text` | 1–2000 trimmed characters, NOT NULL | — | Message body |
+| `created_at` | `timestamptz` | NOT NULL | `now()` | Send time |
+
+**RLS:**
+- SELECT: sender or recipient, while the friendship exists
+- INSERT: sender must be `auth.uid()` and the recipient must be an accepted friend
+- UPDATE / DELETE: not granted to client roles
+
+The schema and policies are defined in [chat-migration.sql](../chat-migration.sql), which should be run after `migration.sql`.
+
+---
+
+## 8. State Shape (Frontend)
 
 The following represents how data is structured in the JavaScript runtime after being fetched from Supabase:
 
@@ -190,6 +211,10 @@ interface AppState {
     sent: FriendRequest[]
     incoming: FriendRequest[]
   }
+
+  // Chats
+  activeChatFriendId: string | null
+  chatMessages: DirectMessage[]
 
   // Events (owned + friends')
   events: CalendarEvent[]
@@ -255,6 +280,14 @@ interface FriendRequest {
   receiver_username?: string
 }
 
+interface DirectMessage {
+  id: string
+  sender_id: string
+  recipient_id: string
+  content: string
+  created_at: string
+}
+
 interface Notification {
   id: string
   title: string
@@ -274,7 +307,7 @@ interface CopyPayload {
 
 ---
 
-## 8. LocalStorage Keys (Pre-Migration)
+## 9. LocalStorage Keys (Pre-Migration)
 
 These keys are used by the current client-only version and will be replaced by Supabase queries:
 

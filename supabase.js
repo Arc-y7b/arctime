@@ -329,6 +329,41 @@ async function arctimeGetFriends(userId) {
 }
 
 // ============================================================
+// DIRECT MESSAGES
+// ============================================================
+
+async function arctimeGetRecentMessages(userId, limit = 500) {
+  const { data, error } = await sb
+    .from('messages')
+    .select('id, sender_id, recipient_id, content, created_at')
+    .or(`sender_id.eq.${userId},recipient_id.eq.${userId}`)
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
+    .limit(limit);
+  return { data, error };
+}
+
+async function arctimeGetMessagesBetween(userId, friendId, offset = 0, limit = 50) {
+  const { data, error } = await sb
+    .from('messages')
+    .select('id, sender_id, recipient_id, content, created_at')
+    .or(`and(sender_id.eq.${userId},recipient_id.eq.${friendId}),and(sender_id.eq.${friendId},recipient_id.eq.${userId})`)
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
+    .range(offset, offset + limit - 1);
+  return { data: data ? data.reverse() : data, error };
+}
+
+async function arctimeSendMessage(senderId, recipientId, content) {
+  const { data, error } = await sb
+    .from('messages')
+    .insert({ sender_id: senderId, recipient_id: recipientId, content })
+    .select('id, sender_id, recipient_id, content, created_at')
+    .single();
+  return { data, error };
+}
+
+// ============================================================
 // REALTIME SUBSCRIPTIONS
 // ============================================================
 
@@ -347,6 +382,16 @@ function arctimeSubscribeFriendRequests(userId, callback) {
     .channel('friend-requests')
     .on('postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'friend_requests', filter: `receiver_id=eq.${userId}` },
+      (payload) => callback(payload)
+    )
+    .subscribe();
+}
+
+function arctimeSubscribeMessages(callback) {
+  return sb
+    .channel('direct-messages')
+    .on('postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'messages' },
       (payload) => callback(payload)
     )
     .subscribe();

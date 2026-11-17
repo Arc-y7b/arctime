@@ -1,4 +1,4 @@
-import { ViewportBoundary, MobileCalendarState, SwipeGestureDetector, isPastDay, MobilePresenter } from './mobile.js?v=3.1';
+import { ViewportBoundary, MobileCalendarState, SwipeGestureDetector, isPastDay, MobilePresenter } from './mobile.js?v=3.2';
 
 /**
  * ARCTIME CLIENT ENGINE
@@ -50,7 +50,13 @@ const state = {
 
   // Realtime subscriptions
   _eventsChannel: null,
-  _requestsChannel: null
+  _requestsChannel: null,
+  _messagesChannel: null,
+  chatPreviews: {},
+  activeChatFriendId: null,
+  chatMessages: [],
+  chatMessagesOffset: 0,
+  chatHasMoreMessages: false
 };
 
 // -------------------------------------------------------------
@@ -449,6 +455,17 @@ const showChatsBtn = document.getElementById('showChatsBtn');
 const calendarWrapper = document.getElementById('calendarWrapper');
 const friendsHubWrapper = document.getElementById('friendsWrapper');
 const chatsWrapper = document.getElementById('chatsWrapper');
+const chatFriendsList = document.getElementById('chatFriendsList');
+const chatThreadEmpty = document.getElementById('chatThreadEmpty');
+const chatThread = document.getElementById('chatThread');
+const chatMessagesList = document.getElementById('chatMessagesList');
+const chatThreadAvatar = document.getElementById('chatThreadAvatar');
+const chatThreadName = document.getElementById('chatThreadName');
+const chatBackBtn = document.getElementById('chatBackBtn');
+const chatMessageForm = document.getElementById('chatMessageForm');
+const chatMessageInput = document.getElementById('chatMessageInput');
+const sendChatMessageBtn = document.getElementById('sendChatMessageBtn');
+const loadOlderMessagesBtn = document.getElementById('loadOlderMessagesBtn');
 const pendingRequestsBadge = document.getElementById('pendingRequestsBadge');
 const schedulerPanel = document.querySelector('.scheduler-panel');
 
@@ -2216,6 +2233,7 @@ async function loadAppData() {
   renderNotificationsList();
   updateNotificationsBadge();
   updateClipboardBanner();
+  renderChatFriends();
   
   if (typeof setupMobileAdaptation === 'function') {
     setupMobileAdaptation();
@@ -2228,6 +2246,7 @@ function setupRealtime() {
   // Unsubscribe existing
   if (state._eventsChannel) arctimeUnsubscribe(state._eventsChannel);
   if (state._requestsChannel) arctimeUnsubscribe(state._requestsChannel);
+  if (state._messagesChannel) arctimeUnsubscribe(state._messagesChannel);
   
   // Subscribe to events changes
   state._eventsChannel = arctimeSubscribeEvents('events', async (payload) => {
@@ -2258,6 +2277,7 @@ function setupRealtime() {
         addNotification('Friend Request', `Friend request from ${enriched.name}!`, 'info');
       }
     });
+    state._messagesChannel = arctimeSubscribeMessages(handleRealtimeChatMessage);
   }
 }
 
@@ -2691,13 +2711,65 @@ function toggleViewMode(mode) {
     updateSmartSuggestions();
   } else if (isFriends) {
     renderFriendsHub();
+  } else if (isChats) {
+    renderChatFriends();
+    loadChatPreviews();
   }
 }
 
 showCalendarBtn.addEventListener('click', () => toggleViewMode('calendar'));
 showFriendsHubBtn.addEventListener('click', () => toggleViewMode('friends-hub'));
 showChatsBtn.addEventListener('click', () => toggleViewMode('chats'));
-document.getElementById('openFriendsFromChatsBtn').addEventListener('click', () => {
+document.getElementById('openFriendsFromChatsBtn').addEventListener('click', openFriendsFromChats);
+chatFriendsList.addEventListener('click', (event) => {
+  const friendButton = event.target.closest('[data-friend-id]');
+  if (friendButton) selectChatFriend(friendButton.dataset.friendId);
+});
+chatMessageForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const friendId = state.activeChatFriendId;
+  const content = chatMessageInput.value.trim();
+  if (!friendId || !content) return;
+
+  sendChatMessageBtn.disabled = true;
+  chatMessageInput.disabled = true;
+  try {
+    const { data, error } = await arctimeSendMessage(state.userId, friendId, content);
+    if (error) {
+      console.error('Failed to send chat message:', error);
+      showToast('Failed to send message: ' + error.message, 'info');
+      return;
+    }
+
+    handleRealtimeChatMessage({ new: data });
+    if (state.activeChatFriendId === friendId) chatMessageInput.value = '';
+  } catch (sendError) {
+    console.error('Failed to send chat message:', sendError);
+    showToast('Failed to send message: ' + sendError.message, 'info');
+  } finally {
+    sendChatMessageBtn.disabled = false;
+    chatMessageInput.disabled = false;
+    chatMessageInput.focus();
+  }
+});
+chatMessageInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    chatMessageForm.requestSubmit();
+  }
+});
+loadOlderMessagesBtn.addEventListener('click', async () => {
+  if (!state.activeChatFriendId || !state.chatHasMoreMessages) return;
+  loadOlderMessagesBtn.disabled = true;
+  try {
+    await loadChatMessages(state.activeChatFriendId, false);
+  } finally {
+    loadOlderMessagesBtn.disabled = false;
+  }
+});
+chatBackBtn.addEventListener('click', closeChatConversation);
+
+function openFriendsFromChats() {
   toggleViewMode('friends-hub');
   if (mobilePresenter && document.body.classList.contains('is-mobile')) {
     mobilePresenter.switchTab('friends');
@@ -2706,7 +2778,243 @@ document.getElementById('openFriendsFromChatsBtn').addEventListener('click', () 
     });
     updateMobileFabVisibility();
   }
-});
+}
+
+function renderChatFriends() {
+  chatFriendsList.replaceChildren();
+  const friends = [...state.friendsData];
+  if (friends.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'chat-friends-empty';
+    empty.textContent = 'Add friends to start a conversation.';
+    chatFriendsList.appendChild(empty);
+    return;
+  }
+
+  friends.sort((friendA, friendB) => {
+    const timeA = Date.parse(state.chatPreviews[friendA.id]?.created_at || '') || 0;
+    const timeB = Date.parse(state.chatPreviews[friendB.id]?.created_at || '') || 0;
+    const nameA = friendA.display_name || friendA.username || 'Friend';
+    const nameB = friendB.display_name || friendB.username || 'Friend';
+    return timeB - timeA || nameA.localeCompare(nameB);
+  });
+
+  friends.forEach((friend) => {
+    const preview = state.chatPreviews[friend.id];
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'chat-friend-button';
+    button.dataset.friendId = friend.id;
+    button.classList.toggle('active', state.activeChatFriendId === friend.id);
+    button.setAttribute('aria-current', state.activeChatFriendId === friend.id ? 'true' : 'false');
+
+    const avatar = document.createElement('img');
+    avatar.className = 'chat-friend-avatar';
+    avatar.src = normalizeAvatarUrl(friend.avatar_url || state.avatar);
+    avatar.alt = '';
+
+    const details = document.createElement('span');
+    details.className = 'chat-friend-details';
+    const name = document.createElement('strong');
+    name.textContent = friend.display_name || friend.username || 'Friend';
+    const lastMessage = document.createElement('span');
+    lastMessage.className = 'chat-friend-preview';
+    if (preview) {
+      lastMessage.textContent = `${preview.sender_id === state.userId ? 'You: ' : ''}${preview.content}`;
+    } else {
+      lastMessage.textContent = 'Start a conversation';
+    }
+    details.append(name, lastMessage);
+
+    const time = document.createElement('time');
+    time.className = 'chat-friend-time';
+    if (preview) {
+      time.dateTime = preview.created_at;
+      time.textContent = formatChatTimestamp(preview.created_at);
+    }
+
+    button.append(avatar, details, time);
+    chatFriendsList.appendChild(button);
+  });
+}
+
+function formatChatTimestamp(timestamp) {
+  const date = new Date(timestamp);
+  return Number.isNaN(date.getTime())
+    ? ''
+    : date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+async function loadChatPreviews() {
+  if (!state.userId || state.friendsData.length === 0) return;
+  let result;
+  try {
+    result = await arctimeGetRecentMessages(state.userId);
+  } catch (loadError) {
+    console.error('Failed to load chat previews:', loadError);
+    showToast('Failed to load chats: ' + loadError.message, 'info');
+    return;
+  }
+  const { data, error } = result;
+  if (error) {
+    console.error('Failed to load chat previews:', error);
+    showToast('Failed to load chats. Run chat-migration.sql in Supabase: ' + error.message, 'info');
+    return;
+  }
+
+  const updatedPreviews = {};
+  (data || []).forEach((message) => {
+    const friendId = message.sender_id === state.userId ? message.recipient_id : message.sender_id;
+    if (state.friends[friendId] && !updatedPreviews[friendId]) {
+      updatedPreviews[friendId] = message;
+    }
+  });
+  Object.entries(state.chatPreviews).forEach(([friendId, message]) => {
+    const updated = updatedPreviews[friendId];
+    if (!updated || Date.parse(message.created_at) > Date.parse(updated.created_at)) {
+      if (state.friends[friendId]) updatedPreviews[friendId] = message;
+    }
+  });
+  state.chatPreviews = updatedPreviews;
+  renderChatFriends();
+}
+
+async function selectChatFriend(friendId) {
+  const friend = state.friendsData.find((candidate) => candidate.id === friendId);
+  if (!friend) return;
+
+  state.activeChatFriendId = friendId;
+  state.chatMessages = [];
+  state.chatMessagesOffset = 0;
+  state.chatHasMoreMessages = false;
+  loadOlderMessagesBtn.style.display = 'none';
+  chatThreadEmpty.style.display = 'none';
+  chatThread.style.display = 'flex';
+  chatsWrapper.classList.add('has-active-chat');
+  chatThreadAvatar.src = normalizeAvatarUrl(friend.avatar_url || state.avatar);
+  chatThreadAvatar.alt = '';
+  chatThreadName.textContent = friend.display_name || friend.username || 'Friend';
+  chatMessagesList.textContent = 'Loading messages...';
+  renderChatFriends();
+  await loadChatMessages(friendId, true);
+}
+
+async function loadChatMessages(friendId, initialLoad) {
+  const offset = initialLoad ? 0 : state.chatMessagesOffset;
+  const previousHeight = chatMessagesList.scrollHeight;
+  const previousScrollTop = chatMessagesList.scrollTop;
+  if (initialLoad) chatMessagesList.textContent = 'Loading messages...';
+
+  let result;
+  try {
+    result = await arctimeGetMessagesBetween(state.userId, friendId, offset, 50);
+  } catch (loadError) {
+    if (state.activeChatFriendId !== friendId) return;
+    console.error('Failed to load chat messages:', loadError);
+    if (initialLoad) chatMessagesList.textContent = 'Unable to load messages. Check the chat database setup.';
+    showToast('Failed to load messages: ' + loadError.message, 'info');
+    return;
+  }
+  const { data, error } = result;
+  if (state.activeChatFriendId !== friendId) return;
+  if (error) {
+    console.error('Failed to load chat messages:', error);
+    if (initialLoad) chatMessagesList.textContent = 'Unable to load messages. Check the chat database setup.';
+    showToast('Failed to load messages: ' + error.message, 'info');
+    return;
+  }
+
+  const fetchedMessages = data || [];
+  if (initialLoad) {
+    const fetchedIds = new Set(fetchedMessages.map((message) => message.id));
+    const liveMessages = state.chatMessages.filter((message) => !fetchedIds.has(message.id));
+    state.chatMessages = [...fetchedMessages, ...liveMessages];
+    state.chatMessages.sort((messageA, messageB) =>
+      Date.parse(messageA.created_at) - Date.parse(messageB.created_at)
+    );
+    state.chatMessagesOffset = Math.max(
+      state.chatMessagesOffset,
+      fetchedMessages.length + liveMessages.length
+    );
+  } else {
+    const loadedIds = new Set(state.chatMessages.map((message) => message.id));
+    const olderMessages = fetchedMessages.filter((message) => !loadedIds.has(message.id));
+    state.chatMessages = [...olderMessages, ...state.chatMessages];
+    state.chatMessagesOffset += olderMessages.length;
+  }
+  state.chatHasMoreMessages = fetchedMessages.length === 50;
+  loadOlderMessagesBtn.style.display = state.chatHasMoreMessages ? 'inline-flex' : 'none';
+  renderChatMessages();
+
+  if (initialLoad) {
+    chatMessagesList.scrollTop = chatMessagesList.scrollHeight;
+  } else {
+    chatMessagesList.scrollTop = chatMessagesList.scrollHeight - previousHeight + previousScrollTop;
+  }
+}
+
+function renderChatMessages() {
+  chatMessagesList.replaceChildren();
+  if (state.chatMessages.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'chat-no-messages';
+    empty.textContent = 'No messages yet. Send the first one.';
+    chatMessagesList.appendChild(empty);
+    return;
+  }
+
+  state.chatMessages.forEach((message) => {
+    const row = document.createElement('div');
+    const sentByCurrentUser = message.sender_id === state.userId;
+    row.className = `chat-message-row ${sentByCurrentUser ? 'sent' : 'received'}`;
+
+    const bubble = document.createElement('div');
+    bubble.className = 'chat-message-bubble';
+    bubble.textContent = message.content;
+    const time = document.createElement('time');
+    time.className = 'chat-message-time';
+    time.dateTime = message.created_at;
+    time.textContent = formatChatTimestamp(message.created_at);
+    bubble.appendChild(time);
+    row.appendChild(bubble);
+    chatMessagesList.appendChild(row);
+  });
+}
+
+function handleRealtimeChatMessage(payload) {
+  const message = payload?.new;
+  if (!message || !state.userId) return;
+  const friendId = message.sender_id === state.userId ? message.recipient_id : message.sender_id;
+  if (!state.friends[friendId]) return;
+
+  const currentPreview = state.chatPreviews[friendId];
+  if (!currentPreview || Date.parse(message.created_at) >= Date.parse(currentPreview.created_at)) {
+    state.chatPreviews[friendId] = message;
+  }
+  renderChatFriends();
+
+  if (state.activeChatFriendId !== friendId) return;
+  if (!state.chatMessages.some((existing) => existing.id === message.id)) {
+    state.chatMessages.push(message);
+    state.chatMessages.sort((messageA, messageB) =>
+      Date.parse(messageA.created_at) - Date.parse(messageB.created_at)
+    );
+    state.chatMessagesOffset += 1;
+    renderChatMessages();
+    chatMessagesList.scrollTop = chatMessagesList.scrollHeight;
+  }
+}
+
+function closeChatConversation() {
+  state.activeChatFriendId = null;
+  state.chatMessages = [];
+  state.chatMessagesOffset = 0;
+  state.chatHasMoreMessages = false;
+  chatThread.style.display = 'none';
+  chatThreadEmpty.style.display = 'flex';
+  chatsWrapper.classList.remove('has-active-chat');
+  renderChatFriends();
+}
 
 // Update Navbar Notification Badge
 function updateBadgeDisplay() {
@@ -2870,6 +3178,9 @@ async function removeFriend(friendId) {
   }
   
   delete state.friends[friendId];
+  state.friendsData = state.friendsData.filter((friend) => friend.id !== friendId);
+  delete state.chatPreviews[friendId];
+  if (state.activeChatFriendId === friendId) closeChatConversation();
   state.selectedFriends = state.selectedFriends.filter(id => id !== friendId);
   state.events = state.events.filter(e => e.owner !== friendId);
   
@@ -2878,6 +3189,7 @@ async function removeFriend(friendId) {
   renderCalendar();
   updateSmartSuggestions();
   renderFriendsHub();
+  renderChatFriends();
   
   addNotification('Friend Removed', `Removed ${friendName} from friends list`, 'info');
 }
@@ -2992,6 +3304,7 @@ async function acceptRequest(idx) {
   renderCalendar();
   updateSmartSuggestions();
   renderFriendsHub();
+  renderChatFriends();
   
   addNotification('Friend Connected', `Accepted friend request!`, 'success');
 }

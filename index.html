@@ -12,7 +12,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- Supabase JS SDK -->
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <link rel="stylesheet" href="style.css?v=3.1">
+  <link rel="stylesheet" href="style.css?v=3.2">
 </head>
 <body class="dark-mode">
   <div class="wallpaper-background-layer" id="wallpaperBgLayer"></div>
@@ -359,22 +359,42 @@
               <h2>Chats</h2>
               <p>Conversations with your friends</p>
             </div>
-            <i data-lucide="messages-square" aria-hidden="true"></i>
+            <button type="button" class="chat-add-friend-btn" id="openFriendsFromChatsBtn" title="Add friends to chat" aria-label="Add friends to chat">
+              <i data-lucide="user-plus" aria-hidden="true"></i>
+              <span>Add friends</span>
+            </button>
           </div>
-          <div class="chat-empty-list">
-            <i data-lucide="message-circle" aria-hidden="true"></i>
-            <p>Your conversations will appear here.</p>
+          <div class="chat-friends-list" id="chatFriendsList" aria-label="Friend conversations">
+            <!-- Rendered from accepted friends -->
           </div>
         </aside>
-        <div class="chat-conversation-view">
-          <div class="chat-empty-state">
+        <div class="chat-conversation-view" id="chatConversationView">
+          <div class="chat-empty-state" id="chatThreadEmpty">
             <div class="chat-empty-icon"><i data-lucide="message-circle" aria-hidden="true"></i></div>
-            <h2>Chat with your friends</h2>
-            <p>Messaging isn't available yet. Conversations with your connected friends will appear here.</p>
-            <button type="button" class="btn btn-primary" id="openFriendsFromChatsBtn">
-              <i data-lucide="users" aria-hidden="true"></i>
-              Go to Friends
+            <h2>Your conversations</h2>
+            <p>Select a friend to see your message history or send a message.</p>
+          </div>
+          <div class="chat-thread" id="chatThread" style="display: none;">
+            <header class="chat-thread-header">
+              <button type="button" class="chat-back-btn" id="chatBackBtn" aria-label="Back to conversations">
+                <i data-lucide="arrow-left" aria-hidden="true"></i>
+              </button>
+              <img class="chat-thread-avatar" id="chatThreadAvatar" alt="">
+              <div class="chat-thread-friend">
+                <strong id="chatThreadName"></strong>
+                <span>Friend</span>
+              </div>
+            </header>
+            <button type="button" class="chat-load-older-btn" id="loadOlderMessagesBtn" style="display: none;">
+              Load older messages
             </button>
+            <div class="chat-messages" id="chatMessagesList" role="log" aria-live="polite" aria-label="Message history"></div>
+            <form class="chat-composer" id="chatMessageForm">
+              <textarea id="chatMessageInput" rows="1" maxlength="2000" placeholder="Write a message..." aria-label="Message" required></textarea>
+              <button type="submit" class="chat-send-btn" id="sendChatMessageBtn" aria-label="Send message">
+                <i data-lucide="send" aria-hidden="true"></i>
+              </button>
+            </form>
           </div>
         </div>
       </section>
@@ -825,7 +845,7 @@
     </button>
   </div>
 
-  <script src="supabase.js?v=3.0"></script>
-  <script type="module" src="app.js?v=3.1"></script>
+  <script src="supabase.js?v=3.2"></script>
+  <script type="module" src="app.js?v=3.2"></script>
 </body>
 </html>
