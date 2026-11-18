@@ -19,9 +19,9 @@ export class ViewportBoundary {
 }
 
 export class MobileCalendarState {
-  constructor() {
+  constructor(currentDate = new Date()) {
     this.activeTab = 'calendar';
-    this.activeDayIndex = 1; // Default to Tuesday, June 9 (Monday index is 0)
+    this.activeDayIndex = (currentDate.getDay() + 6) % 7;
     this.isBottomSheetOpen = false;
     this.validTabs = ['calendar', 'friends', 'chats', 'suggestions', 'settings'];
   }

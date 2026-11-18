@@ -19,11 +19,11 @@ test('ViewportBoundary detects mobile mode', () => {
 });
 
 test('MobileCalendarState navigates tabs and days', () => {
-  const state = new MobileCalendarState();
+  const state = new MobileCalendarState(new Date(2026, 10, 18));
   
   // Initial values
   assert.strictEqual(state.activeTab, 'calendar');
-  assert.strictEqual(state.activeDayIndex, 1); // June 9, 2026 is Tuesday (index 1, where Monday is 0)
+  assert.strictEqual(state.activeDayIndex, 2); // November 18, 2026 is Wednesday (Monday index is 0)
   assert.strictEqual(state.isBottomSheetOpen, false);
 
   // Switch tab
@@ -36,15 +36,15 @@ test('MobileCalendarState navigates tabs and days', () => {
   assert.throws(() => state.switchTab('invalid-tab'));
 
   // Day navigation - forward
-  state.changeActiveDay(1); // Tuesday -> Wednesday
-  assert.strictEqual(state.activeDayIndex, 2);
+  state.changeActiveDay(1); // Wednesday -> Thursday
+  assert.strictEqual(state.activeDayIndex, 3);
 
   // Day navigation - backward
-  state.changeActiveDay(-2); // Wednesday -> Monday
-  assert.strictEqual(state.activeDayIndex, 0);
+  state.changeActiveDay(-2); // Thursday -> Tuesday
+  assert.strictEqual(state.activeDayIndex, 1);
 
   // Day navigation - boundary clamping (0 is Monday, 6 is Sunday)
-  state.changeActiveDay(-5); // Monday -> clamped to Monday (0)
+  state.changeActiveDay(-5); // Tuesday -> clamped to Monday (0)
   assert.strictEqual(state.activeDayIndex, 0);
 
   state.changeActiveDay(10); // Monday -> clamped to Sunday (6)
@@ -71,14 +71,17 @@ test('SwipeGestureDetector calculates correct swipe offset', () => {
 });
 
 test('isPastDay blocks bookings on historical days', () => {
-  const currentDayIndex = 1; // Tuesday, June 9
+  const currentDayIndex = 2; // Wednesday, November 18
   
   // Monday is index 0, which is past
   assert.strictEqual(isPastDay(0, currentDayIndex), true);
   
-  // Tuesday is index 1, which is current (not past)
-  assert.strictEqual(isPastDay(1, currentDayIndex), false);
+  // Tuesday is index 1, which is past
+  assert.strictEqual(isPastDay(1, currentDayIndex), true);
 
-  // Wednesday is index 2, which is future (not past)
+  // Wednesday is index 2, which is current (not past)
   assert.strictEqual(isPastDay(2, currentDayIndex), false);
+
+  // Thursday is index 3, which is future (not past)
+  assert.strictEqual(isPastDay(3, currentDayIndex), false);
 });
