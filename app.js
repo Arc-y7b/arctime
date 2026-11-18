@@ -1,4 +1,5 @@
 import { ViewportBoundary, MobileCalendarState, SwipeGestureDetector, isPastDay, MobilePresenter } from './mobile.js?v=3.2';
+import { readCalendarState, createCalendarUrl } from './calendar-url.js';
 
 /**
  * ARCTIME CLIENT ENGINE
@@ -10,10 +11,12 @@ import { ViewportBoundary, MobileCalendarState, SwipeGestureDetector, isPastDay,
 // 1. DATA MODELS & INITIAL STATE
 // -------------------------------------------------------------
 
+const initialCalendarState = readCalendarState(window.location.search);
+
 // Active state of the application
 const state = {
-  currentWeekStart: new Date(2026, 5, 8), // Monday, June 8, 2026
-  activeView: 'week', // 'week' or 'month'
+  currentWeekStart: initialCalendarState.currentWeekStart,
+  activeView: initialCalendarState.activeView,
   userAvailability: 'free', // 'free' or 'busy'
   highlightCommonFree: true,
   selectedFriends: [], // No friends selected by default
@@ -1123,6 +1126,13 @@ function renderCalendar() {
   } else {
     renderWeekView();
   }
+
+  const calendarUrl = createCalendarUrl(
+    window.location.href,
+    state.currentWeekStart,
+    state.activeView
+  );
+  window.history.replaceState(window.history.state, '', calendarUrl.href);
 }
 
 // Populate the right side smart scheduler suggestion list
@@ -1861,6 +1871,7 @@ function setViewMode(mode) {
 if (viewWeekBtn && viewMonthBtn) {
   viewWeekBtn.addEventListener('click', () => setViewMode('week'));
   viewMonthBtn.addEventListener('click', () => setViewMode('month'));
+  setViewMode(state.activeView);
 }
 
 // Navigation switcher controls
