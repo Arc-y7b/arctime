@@ -68,14 +68,18 @@ ALTER TABLE public.event_attendees ENABLE ROW LEVEL SECURITY;
 -- ============================================================
 
 -- 3a. PROFILES
+DROP POLICY IF EXISTS "profiles_read_all" ON public.profiles;
 CREATE POLICY "profiles_read_all" ON public.profiles
   FOR SELECT USING (true);
+DROP POLICY IF EXISTS "profiles_insert_own" ON public.profiles;
 CREATE POLICY "profiles_insert_own" ON public.profiles
   FOR INSERT WITH CHECK (auth.uid() = id);
+DROP POLICY IF EXISTS "profiles_update_own" ON public.profiles;
 CREATE POLICY "profiles_update_own" ON public.profiles
   FOR UPDATE USING (auth.uid() = id);
 
 -- 3b. EVENTS (references friendships — must come after friendships table creation)
+DROP POLICY IF EXISTS "events_select_own_and_friends" ON public.events;
 CREATE POLICY "events_select_own_and_friends" ON public.events
   FOR SELECT USING (
     user_id = auth.uid()
@@ -85,32 +89,43 @@ CREATE POLICY "events_select_own_and_friends" ON public.events
       WHERE user_id_1 = auth.uid() OR user_id_2 = auth.uid()
     )
   );
+DROP POLICY IF EXISTS "events_insert_own" ON public.events;
 CREATE POLICY "events_insert_own" ON public.events
   FOR INSERT WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "events_update_own" ON public.events;
 CREATE POLICY "events_update_own" ON public.events
   FOR UPDATE USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "events_delete_own" ON public.events;
 CREATE POLICY "events_delete_own" ON public.events
   FOR DELETE USING (user_id = auth.uid());
 
 -- 3c. FRIEND REQUESTS
+DROP POLICY IF EXISTS "friend_requests_insert" ON public.friend_requests;
 CREATE POLICY "friend_requests_insert" ON public.friend_requests
   FOR INSERT WITH CHECK (sender_id = auth.uid());
+DROP POLICY IF EXISTS "friend_requests_select" ON public.friend_requests;
 CREATE POLICY "friend_requests_select" ON public.friend_requests
   FOR SELECT USING (sender_id = auth.uid() OR receiver_id = auth.uid());
+DROP POLICY IF EXISTS "friend_requests_update_receiver" ON public.friend_requests;
 CREATE POLICY "friend_requests_update_receiver" ON public.friend_requests
   FOR UPDATE USING (receiver_id = auth.uid());
+DROP POLICY IF EXISTS "friend_requests_delete" ON public.friend_requests;
 CREATE POLICY "friend_requests_delete" ON public.friend_requests
   FOR DELETE USING (sender_id = auth.uid() OR receiver_id = auth.uid());
 
 -- 3d. FRIENDSHIPS
+DROP POLICY IF EXISTS "friendships_select" ON public.friendships;
 CREATE POLICY "friendships_select" ON public.friendships
   FOR SELECT USING (auth.uid() IN (user_id_1, user_id_2));
+DROP POLICY IF EXISTS "friendships_insert" ON public.friendships;
 CREATE POLICY "friendships_insert" ON public.friendships
   FOR INSERT WITH CHECK (auth.uid() IN (user_id_1, user_id_2));
+DROP POLICY IF EXISTS "friendships_delete" ON public.friendships;
 CREATE POLICY "friendships_delete" ON public.friendships
   FOR DELETE USING (auth.uid() = user_id_1 OR auth.uid() = user_id_2);
 
 -- 3e. EVENT ATTENDEES (references friendships)
+DROP POLICY IF EXISTS "event_attendees_select" ON public.event_attendees;
 CREATE POLICY "event_attendees_select" ON public.event_attendees
   FOR SELECT USING (
     user_id = auth.uid()
@@ -121,6 +136,7 @@ CREATE POLICY "event_attendees_select" ON public.event_attendees
       WHERE user_id_1 = auth.uid() OR user_id_2 = auth.uid()
     )
   );
+DROP POLICY IF EXISTS "event_attendees_insert" ON public.event_attendees;
 CREATE POLICY "event_attendees_insert" ON public.event_attendees
   FOR INSERT WITH CHECK (
     user_id = auth.uid()
@@ -131,9 +147,27 @@ CREATE POLICY "event_attendees_insert" ON public.event_attendees
 -- 4. ENABLE REALTIME FOR LIVE SYNC
 -- ============================================================
 
-ALTER PUBLICATION supabase_realtime ADD TABLE public.events;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.friend_requests;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles;
+DO $$
+DECLARE
+  realtime_table TEXT;
+BEGIN
+  FOREACH realtime_table IN ARRAY ARRAY['events', 'friend_requests', 'profiles']
+  LOOP
+    IF NOT EXISTS (
+      SELECT 1
+      FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime'
+        AND schemaname = 'public'
+        AND tablename = realtime_table
+    ) THEN
+      EXECUTE format(
+        'ALTER PUBLICATION supabase_realtime ADD TABLE public.%I',
+        realtime_table
+      );
+    END IF;
+  END LOOP;
+END
+$$;
 
 -- ============================================================
 -- 5. AUTOMATIC PROFILE CREATION TRIGGER ON SIGNUP
@@ -165,6 +199,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Trigger execution
-CREATE OR REPLACE TRIGGER on_auth_user_created
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();

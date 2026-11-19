@@ -85,3 +85,12 @@ test('sending a message inserts the authenticated sender and friend recipient', 
   assert.equal(requests[0].insert.recipient_id, 'friend-id');
   assert.equal(requests[0].insert.content, 'Hello!');
 });
+
+test('main migration is safe to rerun', async () => {
+  const migration = await readFile(new URL('../migration.sql', import.meta.url), 'utf8');
+
+  assert.match(migration, /DROP POLICY IF EXISTS "profiles_read_all" ON public\.profiles;/);
+  assert.match(migration, /CREATE POLICY "profiles_read_all" ON public\.profiles/);
+  assert.match(migration, /pg_publication_tables[\s\S]*tablename = realtime_table/);
+  assert.match(migration, /DROP TRIGGER IF EXISTS on_auth_user_created ON auth\.users;/);
+});
