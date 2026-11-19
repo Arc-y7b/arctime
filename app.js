@@ -12,6 +12,7 @@ import { readCalendarState, createCalendarUrl } from './calendar-url.js';
 // -------------------------------------------------------------
 
 const initialCalendarState = readCalendarState(window.location.search);
+let mobilePresenter = null;
 
 // Active state of the application
 const state = {
@@ -3652,8 +3653,6 @@ if (pasteActionModal) {
 // -------------------------------------------------------------
 // MOBILE PORTRAIT ADAPTATION INTEGRATION
 // -------------------------------------------------------------
-
-let mobilePresenter = null;
 
 function updateMobileFabVisibility() {
   const mobileFabBtn = document.getElementById('mobileFabBtn');
