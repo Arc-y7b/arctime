@@ -2770,6 +2770,17 @@ chatMessageInput.addEventListener('keydown', (event) => {
     chatMessageForm.requestSubmit();
   }
 });
+chatMessagesList.addEventListener('wheel', (event) => {
+  if (!state.activeChatFriendId || event.deltaY === 0) return;
+
+  event.preventDefault();
+  const deltaY = event.deltaMode === WheelEvent.DOM_DELTA_LINE
+    ? event.deltaY * 16
+    : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+      ? event.deltaY * chatMessagesList.clientHeight
+      : event.deltaY;
+  chatMessagesList.scrollTop += deltaY;
+}, { passive: false });
 loadOlderMessagesBtn.addEventListener('click', async () => {
   if (!state.activeChatFriendId || !state.chatHasMoreMessages) return;
   loadOlderMessagesBtn.disabled = true;
@@ -3667,10 +3678,37 @@ function updateMobileFabVisibility() {
 
 function setupMobileAdaptation() {
   mobilePresenter = new MobilePresenter();
+
+  const syncChatInputViewport = () => {
+    const shouldResizeChat = document.body.classList.contains('is-mobile')
+      && document.activeElement === chatMessageInput;
+    const visualViewport = window.visualViewport;
+
+    document.body.classList.toggle('chat-input-focused', shouldResizeChat);
+    if (shouldResizeChat) {
+      chatsWrapper.style.setProperty(
+        '--chat-viewport-height',
+        `${visualViewport?.height ?? window.innerHeight}px`
+      );
+      chatsWrapper.style.setProperty(
+        '--chat-viewport-top',
+        `${visualViewport?.offsetTop ?? 0}px`
+      );
+    } else {
+      chatsWrapper.style.removeProperty('--chat-viewport-height');
+      chatsWrapper.style.removeProperty('--chat-viewport-top');
+    }
+  };
+
+  chatMessageInput.addEventListener('focus', syncChatInputViewport);
+  chatMessageInput.addEventListener('blur', syncChatInputViewport);
+  window.visualViewport?.addEventListener('resize', syncChatInputViewport);
+  window.visualViewport?.addEventListener('scroll', syncChatInputViewport);
   
   // Handle resize events
   window.addEventListener('resize', () => {
     mobilePresenter.handleResize();
+    syncChatInputViewport();
     updateMobileActiveDay();
     updateMobileFabVisibility();
   });
